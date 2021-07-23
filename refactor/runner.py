@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from typing import Iterable, List, Optional
+from typing import Iterable, List, Optional, Type
 
 from refactor.core import Rule, Session
 
@@ -27,7 +27,7 @@ def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
     return 0
 
 
-def run(rules: List[Rule]) -> int:
+def run(rules: List[Type[Rule]]) -> int:
     session = Session(rules)
     main = partial(unbound_main, session=session)
     return main()

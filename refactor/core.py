@@ -5,11 +5,13 @@ import copy
 import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
+from itertools import chain
 from pathlib import Path
-from typing import List, Optional, Tuple, cast
+from typing import ClassVar, List, Optional, Tuple, Type, cast
 
 from refactor.ast import PositinalNode, split_lines
 from refactor.change import Change
+from refactor.context import Context, Representative
 
 
 @dataclass
@@ -39,7 +41,12 @@ class Action:
         return copy.deepcopy(self.node)
 
 
+@dataclass
 class Rule:
+    context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
+
+    context: Context
+
     def match(self, node: ast.AST) -> Optional[Action]:
         """Match the node against the current refactoring rule.
 
@@ -52,19 +59,37 @@ class Rule:
 class Session:
     """A refactoring session."""
 
-    rules: List[Rule] = field(default_factory=list)
+    rules: List[Type[Rule]] = field(default_factory=list)
 
-    def _run(self, source: str, *, _changed: bool = False) -> Tuple[str, bool]:
+    def _initialize_rules(self, tree: ast.Module, source: str) -> List[Rule]:
+        raw_dependency_chain = chain.from_iterable(
+            rule.context_providers for rule in self.rules
+        )
+        context = Context.from_dependencies(
+            frozenset(raw_dependency_chain), tree=tree, source=source
+        )
+        return [rule(context) for rule in self.rules]
+
+    def _run(
+        self,
+        source: str,
+        *,
+        _changed: bool = False,
+        _rules: Optional[List[Rule]] = None,
+    ) -> Tuple[str, bool]:
         tree = ast.parse(source)
+        rules = _rules or self._initialize_rules(tree, source)
 
         for node in ast.walk(tree):
             if not isinstance(node, PositinalNode):
                 continue
 
-            for rule in self.rules:
+            for rule in rules:
                 with suppress(AssertionError):
                     if action := rule.match(node):
-                        return self._run(action.apply(source), _changed=True)
+                        return self._run(
+                            action.apply(source), _changed=True, _rules=rules
+                        )
 
         return source, _changed
 

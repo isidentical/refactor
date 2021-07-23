@@ -87,4 +87,4 @@ class TypeLiteralRule(refactor.Rule):
 
 
 if __name__ == "__main__":
-    exit(refactor.run(rules=[TypeLiteralRule()]))
+    exit(refactor.run(rules=[TypeLiteralRule]))
