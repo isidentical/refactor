@@ -1,12 +1,10 @@
 import ast
 import textwrap
-from dataclasses import dataclass
 
 import pytest
 
-from refactor.ast import PositionalNode
 from refactor.context import Representative
-from refactor.core import Action, Rule, Session, TargetedAction
+from refactor.core import Action, ReplacementAction, Rule, Session
 
 
 @pytest.mark.parametrize(
@@ -34,7 +32,7 @@ from refactor.core import Action, Rule, Session, TargetedAction
 )
 def test_apply_simple(source, target_func, replacement, expected):
     tree = ast.parse(source)
-    action = TargetedAction(target_func(tree), replacement)
+    action = ReplacementAction(target_func(tree), replacement)
     assert action.apply(source) == expected
 
 
@@ -68,7 +66,9 @@ class PlaceholderReplacer(Rule):
         assert isinstance(node, ast.Name)
         assert node.id == "placeholder"
 
-        return TargetedAction(node, self.context["simple"].infer_value(node))
+        return ReplacementAction(
+            node, self.context["simple"].infer_value(node)
+        )
 
 
 @pytest.mark.parametrize(

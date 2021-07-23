@@ -7,7 +7,7 @@ from contextlib import suppress
 from dataclasses import dataclass, field
 from itertools import chain
 from pathlib import Path
-from typing import ClassVar, List, Optional, Tuple, Type, cast
+from typing import ClassVar, List, Optional, Tuple, Type
 
 from refactor.ast import PositionalNode, split_lines
 from refactor.change import Change
@@ -44,7 +44,7 @@ class Action:
 
 
 @dataclass
-class TargetedAction(Action):
+class ReplacementAction(Action):
     node: ast.AST
     target: ast.AST
 

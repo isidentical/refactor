@@ -9,6 +9,7 @@ repos:
     rev: 21.7b0
     hooks:
     -   id: black
+        exclude: '^examples/test/'
 -   repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.9.2
     hooks:
@@ -22,3 +23,18 @@ repos:
     rev: 'v0.910'
     hooks:
       -  id: mypy
+-   repo: https://github.com/hakancelik96/unimport
+    rev: 0.8.3
+    hooks:
+      - id: unimport
+        args:
+        -   --remove
+        -   --ignore-init
+-   repo: https://github.com/executablebooks/mdformat/
+    rev: 0.7.5
+    hooks:
+    -   id: mdformat
+        exclude: ^paper/
+        additional_dependencies:
+        - mdformat-black
+        - mdformat_tables

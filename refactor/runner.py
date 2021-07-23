@@ -8,7 +8,13 @@ from refactor.core import Rule, Session
 
 
 def expand_paths(path: Path) -> Iterable[Path]:
-    return (path for path in path.glob("**/*.py") if path.is_file())
+    if path.is_file():
+        yield path
+        return None
+
+    for path in path.glob("**/*.py"):
+        if path.is_file():
+            yield path
 
 
 def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
