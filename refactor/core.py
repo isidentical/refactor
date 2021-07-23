@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import List, Optional, cast
@@ -31,6 +32,9 @@ class Action:
 
     def build(self) -> Node:
         return self.node
+
+    def branch(self) -> Node:
+        return copy.deepcopy(self.node)
 
 
 class Rule:
