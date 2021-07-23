@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+from contextlib import suppress
 from dataclasses import dataclass, field
 from typing import List, Optional, cast
 
@@ -32,7 +33,7 @@ class Action:
         return self.node
 
 
-class Unit:
+class Rule:
     def match(self, node: Node) -> Optional[Action]:
         """Match the node against the current refactoring rule.
 
@@ -45,7 +46,7 @@ class Unit:
 class Session:
     """A refactoring session."""
 
-    rules: List[Unit] = field(default_factory=list)
+    rules: List[Rule] = field(default_factory=list)
 
     def run(self, source: str) -> str:
         """Refactor the given string with the rules bound to
@@ -58,7 +59,8 @@ class Session:
                 continue
 
             for rule in self.rules:
-                if action := rule.match(node):
-                    return self.run(action.apply(source))
+                with suppress(AssertionError):
+                    if action := rule.match(node):
+                        return self.run(action.apply(source))
 
         return source
