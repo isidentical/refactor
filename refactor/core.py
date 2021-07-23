@@ -9,7 +9,7 @@ from itertools import chain
 from pathlib import Path
 from typing import ClassVar, List, Optional, Tuple, Type, cast
 
-from refactor.ast import PositinalNode, split_lines
+from refactor.ast import PositionalNode, split_lines
 from refactor.change import Change
 from refactor.context import Context, Representative
 
@@ -81,7 +81,7 @@ class Session:
         rules = _rules or self._initialize_rules(tree, source)
 
         for node in ast.walk(tree):
-            if not isinstance(node, PositinalNode):
+            if not isinstance(node, PositionalNode):
                 continue
 
             for rule in rules:

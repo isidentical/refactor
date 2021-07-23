@@ -3,7 +3,7 @@ from typing import List, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable
-class PositinalNode(Protocol):
+class PositionalNode(Protocol):
     lineno: int
     col_offset: int
     end_lineno: int

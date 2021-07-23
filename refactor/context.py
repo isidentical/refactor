@@ -12,6 +12,9 @@ class Context:
     tree: ast.AST
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
+    def __getitem__(self, key):
+        return self.metadata[key]
+
     @classmethod
     def from_dependencies(
         cls, dependencies: Iterable[Type[Representative]], **kwargs

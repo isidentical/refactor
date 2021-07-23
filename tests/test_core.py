@@ -4,13 +4,14 @@ from dataclasses import dataclass
 
 import pytest
 
-from refactor.ast import Node
+from refactor.ast import PositionalNode
+from refactor.context import Representative
 from refactor.core import Action, Rule, Session
 
 
 @dataclass
 class TargetedAction(Action):
-    replacement: Node
+    replacement: PositionalNode
 
     def build(self):
         return self.replacement
@@ -60,14 +61,32 @@ class PlusToMinusRule(Rule):
         return SimpleAction(node)
 
 
+class SimpleRepresentative(Representative):
+    name = "simple"
+
+    def infer_value(self, node):
+        return ast.Constant(42)
+
+
+class PlaceholderReplacer(Rule):
+
+    context_providers = (SimpleRepresentative,)
+
+    def match(self, node):
+        assert isinstance(node, ast.Name)
+        assert node.id == "placeholder"
+
+        return TargetedAction(node, self.context["simple"].infer_value(node))
+
+
 @pytest.mark.parametrize(
     "source, rules, expected_source",
     [
-        ("1+1", [PlusToMinusRule()], "1 - 1"),
-        ("print(1 + 1)", [PlusToMinusRule()], "print(1 - 1)"),
+        ("1+1", PlusToMinusRule, "1 - 1"),
+        ("print(1 + 1)", PlusToMinusRule, "print(1 - 1)"),
         (
             "print(1 + 1, some_other_stuff) and 2 + 2",
-            [PlusToMinusRule()],
+            PlusToMinusRule,
             "print(1 - 1, some_other_stuff) and 2 - 2",
         ),
         (
@@ -76,23 +95,31 @@ class PlusToMinusRule(Rule):
             1 +
             2
         )""",
-            [PlusToMinusRule()],
+            PlusToMinusRule,
             """
         print(
             1 - 2
         )""",
         ),
+        (
+            "print(x, y, placeholder, z)",
+            PlaceholderReplacer,
+            "print(x, y, 42, z)",
+        ),
     ]
     + [
-        ("1*1", [PlusToMinusRule()], "1*1"),
+        ("1*1", PlusToMinusRule, "1*1"),
         (
             "print(no,change,style)",
-            [PlusToMinusRule()],
+            PlusToMinusRule,
             "print(no,change,style)",
         ),
     ],
 )
 def test_session_simple(source, rules, expected_source):
+    if isinstance(rules, type):
+        rules = [rules]
+
     source, expected_source = textwrap.dedent(source), textwrap.dedent(
         expected_source
     )
