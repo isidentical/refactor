@@ -35,10 +35,21 @@ class Action:
         return "\n".join(lines)
 
     def build(self) -> ast.AST:
+        """Crate the replacement node."""
         return self.node
 
     def branch(self) -> ast.AST:
+        """Return a copy view of the original node."""
         return copy.deepcopy(self.node)
+
+
+@dataclass
+class TargetedAction(Action):
+    node: ast.AST
+    target: ast.AST
+
+    def build(self) -> ast.AST:
+        return self.target
 
 
 @dataclass

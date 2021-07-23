@@ -6,15 +6,7 @@ import pytest
 
 from refactor.ast import PositionalNode
 from refactor.context import Representative
-from refactor.core import Action, Rule, Session
-
-
-@dataclass
-class TargetedAction(Action):
-    replacement: PositionalNode
-
-    def build(self):
-        return self.replacement
+from refactor.core import Action, Rule, Session, TargetedAction
 
 
 @pytest.mark.parametrize(
