@@ -1,3 +1,3 @@
-from setuptools import Extension, setup
+from setuptools import setup
 
 setup()

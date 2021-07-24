@@ -23,6 +23,9 @@ repos:
     rev: 'v0.910'
     hooks:
       -  id: mypy
+         args:
+         -   --disallow-incomplete-defs
+         -   --ignore-missing-imports
 -   repo: https://github.com/hakancelik96/unimport
     rev: 0.8.3
     hooks:
