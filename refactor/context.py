@@ -3,6 +3,7 @@ from __future__ import annotations
 import ast
 from collections import deque
 from dataclasses import dataclass, field
+from enum import Enum, auto
 from functools import cached_property
 from typing import (
     Any,
@@ -16,6 +17,8 @@ from typing import (
     Type,
     cast,
 )
+
+from refactor.common import Singleton, is_contextful, pascal_to_snake
 
 
 class Dependable(Protocol):
@@ -74,7 +77,7 @@ class Representative:
         if self_type is Representative:
             return "<base>"
         else:
-            return self_type.__name__.lower()
+            return pascal_to_snake(self_type.__name__)
 
 
 class Ancestry(Representative):
@@ -95,4 +98,68 @@ class Ancestry(Representative):
 
     def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
         self.ensure_annotated()
+
         return node.parent
+
+    def get_parents(self, node: ast.AST) -> Iterable[ast.AST]:
+        self.ensure_annotated()
+
+        parent = node
+        while parent := parent.parent:
+            yield parent
+
+
+class ScopeType(Enum):
+    GLOBAL = auto()
+    CLASS = auto()
+    FUNCTION = auto()
+
+
+@dataclass(unsafe_hash=True)
+class ScopeInfo(Singleton):
+    node: ast.AST
+    scope_type: ScopeType
+    parent_scope: Optional[ScopeInfo] = None
+
+    def can_reach(self, other: ScopeInfo) -> bool:
+        if other.scope_type is ScopeType.GLOBAL:
+            return True
+        elif self is other:
+            return True
+
+        cursor = self
+        while cursor := cursor.parent_scope:  # type: ignore
+            if cursor is other:
+                if other.scope_type is ScopeType.FUNCTION:
+                    return True
+        else:
+            return False
+
+
+class Scope(Representative):
+
+    context_providers = (Ancestry,)
+
+    def resolve(self, node: ast.AST) -> ScopeInfo:
+        if isinstance(node, ast.Module):
+            raise ValueError("Can't resolve Module")
+
+        parents = tuple(
+            filter(is_contextful, self.context["ancestry"].get_parents(node))
+        )
+
+        scope = None
+        for parent in reversed(parents):
+            if isinstance(parent, ast.Module):
+                scope_type = ScopeType.GLOBAL
+            elif isinstance(parent, ast.ClassDef):
+                scope_type = ScopeType.CLASS
+            elif isinstance(
+                parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+            ):
+                scope_type = ScopeType.FUNCTION
+
+            scope = ScopeInfo(parent, scope_type, scope)
+
+        assert scope is not None
+        return scope

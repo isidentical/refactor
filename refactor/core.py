@@ -82,10 +82,9 @@ class Session:
         source: str,
         *,
         _changed: bool = False,
-        _rules: Optional[List[Rule]] = None,
     ) -> Tuple[str, bool]:
         tree = ast.parse(source)
-        rules = _rules or self._initialize_rules(tree, source)
+        rules = self._initialize_rules(tree, source)
 
         for node in ast.walk(tree):
             if not isinstance(node, PositionalNode):
@@ -94,9 +93,7 @@ class Session:
             for rule in rules:
                 with suppress(AssertionError):
                     if action := rule.match(node):
-                        return self._run(
-                            action.apply(source), _changed=True, _rules=rules
-                        )
+                        return self._run(action.apply(source), _changed=True)
 
         return source, _changed
 
