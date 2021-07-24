@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 from dataclasses import dataclass, field
 from functools import cached_property
-from typing import Any, Dict, Iterable, Type
+from typing import Any, Dict, Iterable, Optional, Type
 
 
 @dataclass
@@ -41,3 +41,24 @@ class Representative:
             return "<base>"
         else:
             return self_type.__name__.lower()
+
+
+class Ancestry(Representative):
+    def marked(self, node: ast.AST) -> bool:
+        return hasattr(node, "parent")
+
+    def annotate(self, node: ast.AST) -> None:
+        if self.marked(node):
+            return None
+
+        node.parent = None
+        for parent in ast.walk(node):
+            for child in ast.iter_child_nodes(parent):
+                child.parent = parent
+
+    def ensure_annotated(self) -> None:
+        self.annotate(self.context.tree)
+
+    def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+        self.ensure_annotated()
+        return node.parent

@@ -26,6 +26,8 @@ repos:
          args:
          -   --disallow-incomplete-defs
          -   --ignore-missing-imports
+         -   --disable-error-code
+         -   attr-defined
 -   repo: https://github.com/hakancelik96/unimport
     rev: 0.8.3
     hooks:
