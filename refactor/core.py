@@ -5,13 +5,12 @@ import copy
 import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
-from itertools import chain
 from pathlib import Path
 from typing import ClassVar, List, Optional, Tuple, Type
 
 from refactor.ast import PositionalNode, split_lines
 from refactor.change import Change
-from refactor.context import Context, Representative
+from refactor.context import Context, Representative, resolve_dependencies
 
 
 @dataclass
@@ -73,11 +72,8 @@ class Session:
     rules: List[Type[Rule]] = field(default_factory=list)
 
     def _initialize_rules(self, tree: ast.Module, source: str) -> List[Rule]:
-        raw_dependency_chain = chain.from_iterable(
-            rule.context_providers for rule in self.rules
-        )
         context = Context.from_dependencies(
-            frozenset(raw_dependency_chain), tree=tree, source=source
+            resolve_dependencies(self.rules), tree=tree, source=source
         )
         return [rule(context) for rule in self.rules]
 
