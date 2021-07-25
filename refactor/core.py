@@ -130,7 +130,7 @@ class Session:
         try:
             with tokenize.open(file) as stream:
                 source = stream.read()
-        except SyntaxError:
+        except (SyntaxError, UnicodeDecodeError):
             return None
 
         new_source, is_changed = self._run(source)
