@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import typing
 from dataclasses import dataclass
-from typing import Dict
+from typing import Dict, List
 
 import refactor
 from refactor import common, context
@@ -30,7 +30,20 @@ class ImportFinder(refactor.Representative):
 
 
 @dataclass
-class AddImportAction(refactor.Action):
+class AddNewImport(refactor.NewStatementAction):
+    module: str
+    names: List[str]
+
+    def build(self) -> ast.AST:
+        return ast.ImportFrom(
+            level=0,
+            module=self.module,
+            names=[ast.alias(name) for name in self.names],
+        )
+
+
+@dataclass
+class ModifyExistingImport(refactor.Action):
     name: str
 
     def build(self) -> ast.AST:
@@ -43,6 +56,20 @@ class TypingAutoImporter(refactor.Rule):
 
     context_providers = (ImportFinder, context.Scope)
 
+    def find_last_import(self, tree: ast.AST) -> ast.stmt:
+        assert isinstance(tree, ast.Module)
+        for index, node in enumerate(tree.body, -1):
+            if isinstance(node, ast.Expr) and isinstance(
+                node.value, ast.Constant
+            ):
+                continue
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                continue
+            else:
+                break
+
+        return tree.body[index]
+
     def match(self, node: ast.AST) -> refactor.Action:
         assert isinstance(node, ast.Name)
         assert isinstance(node.ctx, ast.Load)
@@ -54,11 +81,15 @@ class TypingAutoImporter(refactor.Rule):
             "typing", scope=scope
         )
 
+        if len(typing_imports) == 0:
+            last_import = self.find_last_import(self.context.tree)
+            return AddNewImport(last_import, "typing", [node.id])
+
         assert len(typing_imports) >= 1
         assert node.id not in typing_imports
 
         closest_import = common.find_closest(node, *typing_imports.values())
-        return AddImportAction(closest_import, node.id)
+        return ModifyExistingImport(closest_import, node.id)
 
 
 if __name__ == "__main__":

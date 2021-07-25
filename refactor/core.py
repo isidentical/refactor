@@ -6,7 +6,7 @@ import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, List, Optional, Tuple, Type
+from typing import ClassVar, List, Optional, Tuple, Type, cast
 
 from refactor.ast import PositionalNode, split_lines
 from refactor.change import Change
@@ -26,7 +26,7 @@ class Action:
         start_prefix = target_lines[0][: self.node.col_offset]
         end_prefix = target_lines[-1][self.node.end_col_offset :]
 
-        replacement = ast.unparse(self.build()).splitlines()
+        replacement = split_lines(ast.unparse(self.build()))
         replacement[0] = start_prefix + replacement[0]
         replacement[-1] += end_prefix
 
@@ -49,6 +49,16 @@ class ReplacementAction(Action):
 
     def build(self) -> ast.AST:
         return self.target
+
+
+class NewStatementAction(Action):
+    def apply(self, source: str) -> str:
+        """Add a new statement just right after the original node."""
+        lines = split_lines(source)
+        replacement_lines = split_lines(ast.unparse(self.build()))
+        for line in reversed(replacement_lines):
+            lines.insert(cast(int, self.node.end_lineno), line)
+        return "\n".join(lines)
 
 
 @dataclass
