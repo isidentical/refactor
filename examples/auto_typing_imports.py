@@ -73,7 +73,7 @@ class TypingAutoImporter(refactor.Rule):
     def match(self, node: ast.AST) -> refactor.Action:
         assert isinstance(node, ast.Name)
         assert isinstance(node.ctx, ast.Load)
-        assert hasattr(typing, node.id)
+        assert node.id in typing.__all__
         assert not node.id.startswith("__")
 
         scope = self.context["scope"].resolve(node)

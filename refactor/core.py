@@ -93,7 +93,14 @@ class Session:
         *,
         _changed: bool = False,
     ) -> Tuple[str, bool]:
-        tree = ast.parse(source)
+        try:
+            tree = ast.parse(source)
+        except SyntaxError as exc:
+            if _changed is False:
+                return source, _changed
+            else:
+                raise ValueError("Generated source is unparsable") from exc
+
         rules = self._initialize_rules(tree, source)
 
         for node in ast.walk(tree):
