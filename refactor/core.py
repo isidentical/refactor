@@ -126,8 +126,11 @@ class Session:
         containing the refactored version. If nothing changes, return
         None."""
 
-        with tokenize.open(file) as stream:
-            source = stream.read()
+        try:
+            with tokenize.open(file) as stream:
+                source = stream.read()
+        except SyntaxError:
+            return None
 
         new_source, is_changed = self._run(source)
 
