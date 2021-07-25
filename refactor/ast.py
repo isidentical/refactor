@@ -1,12 +1,4 @@
-from typing import List, Protocol, runtime_checkable
-
-
-@runtime_checkable
-class PositionalNode(Protocol):
-    lineno: int
-    col_offset: int
-    end_lineno: int
-    end_col_offset: int
+from typing import List
 
 
 def split_lines(source: str) -> List[str]:

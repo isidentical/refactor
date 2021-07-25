@@ -1,7 +1,8 @@
 from __future__ import annotations
 
 import ast
-from typing import Any, Dict, Tuple
+from functools import lru_cache
+from typing import Any, Dict, Tuple, Type
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
@@ -65,6 +66,18 @@ def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
 
     sorted_targets = sorted(targets, key=closest)
     return sorted_targets[0]
+
+
+_POSITIONAL_ATTRIBUTES = frozenset(
+    ("lineno", "col_offset", "end_lineno", "end_col_offset")
+)
+
+
+@lru_cache(512)
+def has_positions(node_type: Type[ast.AST]) -> bool:
+    """Return `True` if the given `node_type` tracks
+    source positions."""
+    return _POSITIONAL_ATTRIBUTES.issubset(node_type._attributes)
 
 
 class Singleton:

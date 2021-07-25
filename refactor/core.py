@@ -8,8 +8,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, List, Optional, Tuple, Type, cast
 
-from refactor.ast import PositionalNode, split_lines
+from refactor.ast import split_lines
 from refactor.change import Change
+from refactor.common import has_positions
 from refactor.context import Context, Representative, resolve_dependencies
 
 
@@ -104,7 +105,7 @@ class Session:
         rules = self._initialize_rules(tree, source)
 
         for node in ast.walk(tree):
-            if not isinstance(node, PositionalNode):
+            if not has_positions(type(node)):  # type: ignore
                 continue
 
             for rule in rules:
