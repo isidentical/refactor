@@ -18,7 +18,7 @@ from refactor.context import Context, Representative, resolve_dependencies
 class Action:
     node: ast.AST
 
-    def apply(self, source: str) -> str:
+    def apply(self, context: Context, source: str) -> str:
         """Refactor a source segment in the given string."""
         lines = split_lines(source)
         view = slice(self.node.lineno - 1, self.node.end_lineno)
@@ -27,7 +27,7 @@ class Action:
         start_prefix = target_lines[0][: self.node.col_offset]
         end_prefix = target_lines[-1][self.node.end_col_offset :]
 
-        replacement = split_lines(ast.unparse(self.build()))
+        replacement = split_lines(context.unparse(self.build()))
         replacement[0] = start_prefix + replacement[0]
         replacement[-1] += end_prefix
 
@@ -53,10 +53,10 @@ class ReplacementAction(Action):
 
 
 class NewStatementAction(Action):
-    def apply(self, source: str) -> str:
+    def apply(self, context: Context, source: str) -> str:
         """Add a new statement just right after the original node."""
         lines = split_lines(source)
-        replacement_lines = split_lines(ast.unparse(self.build()))
+        replacement_lines = split_lines(context.unparse(self.build()))
         for line in reversed(replacement_lines):
             lines.insert(cast(int, self.node.end_lineno), line)
         return "\n".join(lines)
@@ -111,7 +111,9 @@ class Session:
             for rule in rules:
                 with suppress(AssertionError):
                     if action := rule.match(node):
-                        return self._run(action.apply(source), _changed=True)
+                        return self._run(
+                            action.apply(rule.context, source), _changed=True
+                        )
 
         return source, _changed
 

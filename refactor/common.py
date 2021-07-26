@@ -68,16 +68,26 @@ def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     return sorted_targets[0]
 
 
-_POSITIONAL_ATTRIBUTES = frozenset(
-    ("lineno", "col_offset", "end_lineno", "end_col_offset")
+_POSITIONAL_ATTRIBUTES = (
+    "lineno",
+    "col_offset",
+    "end_lineno",
+    "end_col_offset",
 )
+_POSITIONAL_ATTRIBUTES_SET = frozenset(_POSITIONAL_ATTRIBUTES)
 
 
 @lru_cache(512)
 def has_positions(node_type: Type[ast.AST]) -> bool:
     """Return `True` if the given `node_type` tracks
     source positions."""
-    return _POSITIONAL_ATTRIBUTES.issubset(node_type._attributes)
+    return _POSITIONAL_ATTRIBUTES_SET.issubset(node_type._attributes)
+
+
+def position_for(node):
+    return tuple(
+        getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES
+    )
 
 
 class Singleton:

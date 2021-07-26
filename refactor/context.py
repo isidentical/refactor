@@ -18,6 +18,7 @@ from typing import (
     cast,
 )
 
+from refactor.ast import Unparser, UnparserBase
 from refactor.common import Singleton, is_contextful, pascal_to_snake
 
 
@@ -46,6 +47,14 @@ class Context:
     source: str
     tree: ast.AST
     metadata: Dict[str, Representative] = field(default_factory=dict)
+
+    def unparse(self, node: ast.AST) -> str:
+        if rep := self.metadata.get("unparse"):
+            unparser = rep.unparse
+        else:
+            unparser = ast.unparse
+
+        return unparser(node)
 
     def __getitem__(self, key: str) -> Representative:
         return self.metadata[key]
@@ -163,3 +172,16 @@ class Scope(Representative):
 
         assert scope is not None
         return scope
+
+
+class CustomUnparser(Representative):
+
+    unparser: ClassVar[Type[Unparser]] = UnparserBase
+
+    @property
+    def name(self):
+        return "unparse"
+
+    def unparse(self, node: ast.AST) -> str:
+        unparser = self.unparser(source=self.context.source)
+        return unparser.unparse(node)
