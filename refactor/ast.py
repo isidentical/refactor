@@ -13,10 +13,10 @@ def split_lines(source: str) -> List[str]:
 
 class Unparser(Protocol):
     def __init__(self, source: str, *args: Any, **kwargs: Any) -> None:
-        ...
+        ...  # pragma: no cover
 
     def unparse(self, node: ast.AST) -> str:
-        ...
+        ...  # pragma: no cover
 
 
 class UnparserBase(ast._Unparser):  # type: ignore

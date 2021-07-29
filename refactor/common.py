@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from functools import lru_cache
-from typing import Any, Dict, Tuple, Type
+from typing import Any, Dict, Optional, Tuple, Type
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
@@ -18,11 +18,22 @@ def apply_condition(condition: bool, node: ast.expr) -> ast.expr:
         return negate(node)
 
 
-def is_truthy(op: ast.cmpop) -> bool:
-    """Return `True` for comparison operators that
-    depend on truthness (`==`, `is`, `in`), `False`
-    for others."""
-    return isinstance(op, (ast.Eq, ast.In, ast.Is))
+_OPERATOR_MAP = {
+    ast.Eq: True,
+    ast.In: True,
+    ast.Is: True,
+    ast.NotEq: False,
+    ast.NotIn: False,
+    ast.IsNot: False,
+}
+
+
+def is_truthy(op: ast.cmpop) -> Optional[bool]:
+    """Return `True` for truth-based comparison
+    operators (e.g `==`, `is`, `in`), `False` for
+    falsity-based operators (e.g `!=`, `is not`, `not in`)
+    and `None` for others."""
+    return _OPERATOR_MAP.get(type(op))
 
 
 def is_contextful(node: ast.AST) -> bool:
