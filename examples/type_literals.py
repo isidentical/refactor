@@ -82,7 +82,7 @@ class TypeLiteralRule(refactor.Rule):
         base_type_name = type(base_type_node.value).__name__
 
         return Action(
-            node, arg, base_type_name, negate=common.is_truthy(operator)
+            node, arg, base_type_name, negate=bool(common.is_truthy(operator))
         )
 
 
