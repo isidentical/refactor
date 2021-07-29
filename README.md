@@ -1,72 +1,71 @@
 # Refactor
 
-Simple, dependency-free, AST based source code refactoring interface.
+Simple, hassle-free, dependency-free, AST based source code refactoring
+toolkit.
 
-> :warning: **This project is still work-in-progress**: Be very careful with depending on the APIs!
+## Why? How?
 
-## How
+`refactor` is an end-to-end refactoring framework that is built on top
+of the 'simple but effective refactorings' assumption. It is much easier
+to write a simple script with it rather than trying to figure out what
+sort of a regex you need in order to replace a pattern (if it is even
+matchable with regexes).
 
-`refactor` is nothing more than a tiny wrapper around your AST processing code. Each refactor
-operation is a rule (`refactor.Rule`) where they return either an action (`refactor.Action`) to
-translate or None from their `match` method.
+Every refactoring rule offers a single entrypoint, `match()`, where they
+accept an `AST` node (from the `ast` module in the standard library) and
+respond with either returning an action to refactor or nothing. If the
+rule succeeds on the input, then the returned action will build a
+replacement node and `refactor` will simply replace the code segment
+that belong to the input with the new version.
 
-Here is an example rule that replaces all `placeholder`s with `42`. The `ReplacementAction` is
-a subclass of `refactor.Action`, which takes the original node and the replacement node and
-changes the segment belonging the initial node with the unparsed version of other.
+Here is a complete script that will replace every `placeholder` access
+with `42` (not the definitions) on the given list of files:
 
 ```py
 import ast
-import refactor
-from refactor import Rule, ReplacementAction
+from refactor import Rule, ReplacementAction, run
 
-class ReplacePlaceholders(Rule):
-
+class Replace(Rule):
+    
     def match(self, node):
         assert isinstance(node, ast.Name)
-        assert isinstance(node.ctx, ast.Load)
-        assert node.id == "placeholder"
-
+        assert node.id == 'placeholder'
+        
         replacement = ast.Constant(42)
         return ReplacementAction(node, replacement)
-
+        
 if __name__ == "__main__":
-    refactor.run(rules=[ReplacePlaceholders])
+    run(rules=[Replace])
 ```
 
-The `refactor` package comes bundled with a simple entry point generator, which can
-be used through simply running `refactor.run()` with the rules you want to apply. It will
-create a CLI application which takes files and outputs diffs. Here is an example file that
-we might test the following script;
-
-```py
-def test():
-    print(placeholder)
-    print( # complicated
-        placeholder
-    )
-    if placeholder is placeholder or placeholder > 32:
-        print(3  + placeholder)
-```
-
-And if we run the `refactor` script;
+If we run this on a file, `refactor` will print the diff by default;
 
 ```diff
---- examples/test/placeholder.py
+--- test_file.py
++++ test_file.py
 
-+++ examples/test/placeholder.py
+@@ -1,11 +1,11 @@
 
-@@ -1,8 +1,7 @@
-
- def test():
+ def main():
+-    print(placeholder * 3 + 2)
+-    print(2 +               placeholder      + 3)
++    print(42 * 3 + 2)
++    print(2 +               42      + 3)
+     # some commments
+-    placeholder # maybe other comments
++    42 # maybe other comments
+     if something:
+         other_thing
 -    print(placeholder)
 +    print(42)
-     print( # complicated
--        placeholder
-+        42
-     )
--    if placeholder is placeholder or placeholder > 32:
--        print(3  + placeholder)
--
-+    if 42 is 42 or 42 > 32:
-+        print(3  + 42)
+ 
+ if __name__ == "__main__":
+     main()
 ```
+
+> As stated above, refactor's scope is usually small stuff, so if you
+> want to do full program transformations we highly advise you to look
+> at CST-based solutions like
+> [parso](https://github.com/davidhalter/parso),
+> [LibCST](https://github.com/Instagram/LibCST) and
+> [Fixit](https://github.com/Instagram/Fixit)

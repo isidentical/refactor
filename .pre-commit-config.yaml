@@ -39,7 +39,6 @@ repos:
     rev: 0.7.5
     hooks:
     -   id: mdformat
-        exclude: ^paper/
         additional_dependencies:
         - mdformat-black
         - mdformat_tables
