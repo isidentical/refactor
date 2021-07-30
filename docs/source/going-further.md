@@ -26,17 +26,15 @@ For example;
 ```python
 a = 1
 
-
-def foo(d=5):
+def foo(d = 5):
     b = 4
     c = a + b
     return c + (b * 3) + d
 
-
 class T:
     b = 2
     print(a + b + c)
-
+    
     def foo():
         c = 3
         print(a + b + c + d)
@@ -47,17 +45,15 @@ The code above can be transformed to this;
 ```python
 a = 1
 
-
-def foo(d=5):
+def foo(d = 5):
     b = 4
     c = a + 4
     return c + (4 * 3) + d
 
-
 class T:
     b = 2
     print(a + 2 + c)
-
+    
     def foo():
         c = 3
         print(a + b + 3 + d)
@@ -70,6 +66,7 @@ you'd pass the scope you are in, and it would return a dictionary of all definit
 
 ```python
 class Assignments(refactor.Representative):
+    
     def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
         ...
 ```
@@ -81,10 +78,9 @@ that we need in the class definition:
 ```python
 from refactor.context import Scope
 
-
 class Assignments(refactor.Representative):
     context_providers = (Scope,)
-
+    
     def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
         ...
 ```
@@ -115,23 +111,24 @@ be yielded), for fixing this issue we can simply resolve the scope of this
 assignment and check whether we can reach it or not;
 
 ```python
-def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
-    assignments = defaultdict(list)
-    for node in ast.walk(scope.node):
-        # Check whether this is a simple assignment to a name
-        if (
-            isinstance(node, ast.Assign)
-            and len(node.targets) == 1
-            and isinstance(target := node.targets[0], ast.Name)
-        ):
-            # Check whether we can reach this assignment or not.
-            # For example there might be child functions where the
-            # definition is unreachable for us.
-            assignment_scope = self.context["scope"].resolve(node)
-            if scope.can_reach(assignment_scope):
-                assignments[target.id].append(node)
+    def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
+        assignments = defaultdict(list)
+        for node in ast.walk(scope.node):
+            # Check whether this is a simple assignment to a name
+            if (
+                isinstance(node, ast.Assign)
+                and len(node.targets) == 1
+                and isinstance(target := node.targets[0], ast.Name)
+            ):
+                # Check whether we can reach this assignment or not.
+                # For example there might be child functions where the
+                # definition is unreachable for us.
+                assignment_scope = self.context['scope'].resolve(node)
+                if scope.can_reach(assignment_scope):
+                    assignments[target.id].append(node)
+        
+        return assignments
 
-    return assignments
 ```
 
 If all goes fine, we'd return the dictionary we prepared. The next step is
@@ -139,12 +136,13 @@ writing the actual rule, which is going to be very simple;
 
 ```python
 class PropagationRule(refactor.Rule):
-
+    
     context_providers = (Assignments, Scope)
-
+    
     def match(self, node: ast.AST) -> refactor.Action:
         assert isinstance(node, ast.Name)
         assert isinstance(node.ctx, ast.Load)
+            
 ```
 
 We'll match against a simple name on a load context, we don't want to replace assignment
@@ -165,19 +163,18 @@ And if that is the case, we can simply return a `ReplacementAction` which would 
 the `ast.Name` node with the `ast.Constant` node;
 
 ```python
-return refactor.ReplacementAction(node, value)
+        return refactor.ReplacementAction(node, value)
 ```
 
 Let's give it a try:
 
-```python
+```diff
  $ python examples/propagate.py test.py                  
-
 --- test.py
 +++ test.py
 
 @@ -2,13 +2,13 @@
- 
+
  def foo(d = 5):
      b = 4
 -    c = a + b
