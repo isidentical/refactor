@@ -26,3 +26,7 @@ class Change:
                 os.fspath(self.file),
             )
         )
+
+    def apply_diff(self):
+        with open(self.file, "w") as stream:
+            stream.write(self.refactored_source)
