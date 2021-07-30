@@ -1,14 +1,37 @@
 import ast
 import io
 import tokenize
+from collections import UserList
 from contextlib import contextmanager
+from dataclasses import dataclass
 from functools import cached_property
 from typing import Any, List, Protocol
 
 
-def split_lines(source: str) -> List[str]:
+@dataclass
+class Lines(UserList):
+
+    lines: List[str]
+    trailing_newline: bool = False
+
+    def __post_init__(self):
+        super().__init__(self.lines)
+        self.lines = self.data
+
+    def join(self):
+        source = "\n".join(self.data)
+        if self.trailing_newline:
+            source += "\n"
+        return source
+
+
+def split_lines(source: str) -> Lines:
     # TODO: https://github.com/python/cpython/blob/83d1430ee5b8008631e7f2a75447e740eed065c1/Lib/ast.py#L299-L321
-    return source.splitlines()
+    trailing_newline = False
+    if len(source) >= 1:
+        trailing_newline = source[-1] == "\n"
+
+    return Lines(source.splitlines(), trailing_newline)
 
 
 class Unparser(Protocol):
