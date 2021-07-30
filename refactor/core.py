@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import textwrap
 import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -56,9 +57,16 @@ class NewStatementAction(Action):
     def apply(self, context: Context, source: str) -> str:
         """Add a new statement just right after the original node."""
         lines = split_lines(source)
-        replacement_lines = split_lines(context.unparse(self.build()))
-        for line in reversed(replacement_lines):
-            lines.insert(cast(int, self.node.end_lineno), line)
+
+        # Calculate the last node's indent
+        indent = lines[self.node.lineno - 1][: self.node.col_offset]
+        replacement = context.unparse(self.build())
+        replacement = textwrap.indent(replacement, indent)
+
+        end_line = cast(int, self.node.end_lineno)
+        for line in reversed(split_lines(replacement)):
+            lines.insert(end_line, line)
+
         return "\n".join(lines)
 
 
