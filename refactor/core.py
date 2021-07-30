@@ -33,7 +33,7 @@ class Action:
         replacement[-1] += end_prefix
 
         lines[view] = replacement
-        return "\n".join(lines)
+        return lines.join()
 
     def build(self) -> ast.AST:
         """Crate the replacement node."""
@@ -67,7 +67,7 @@ class NewStatementAction(Action):
         for line in reversed(split_lines(replacement)):
             lines.insert(end_line, line)
 
-        return "\n".join(lines)
+        return lines.join()
 
 
 @dataclass

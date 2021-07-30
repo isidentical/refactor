@@ -2,6 +2,8 @@ import ast
 import textwrap
 import tokenize
 
+import pytest
+
 from refactor.ast import UnparserBase, split_lines
 from refactor.common import position_for
 
@@ -18,7 +20,7 @@ def test_split_lines():
     """
     )
 
-    assert split_lines(source) == [
+    assert list(split_lines(source)) == [
         "1 + 2",
         "print(foo)",
         "if not (",
@@ -26,6 +28,26 @@ def test_split_lines():
         "):",
         "    print(z)",
     ]
+
+
+@pytest.mark.parametrize(
+    "source",
+    [
+        "",
+        "\n",
+        "\n\n",
+        "\n\n\n",
+        "\t\n \n \n",
+        "x",
+        "x\n",
+        "x\n\n",
+        "x\n\n\n",
+        "x\n\nxx\n\n",
+    ],
+)
+def test_split_lines_variations(source):
+    lines = split_lines(source)
+    assert lines.join() == source
 
 
 def test_unparser_base():
