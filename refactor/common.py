@@ -95,7 +95,7 @@ def has_positions(node_type: Type[ast.AST]) -> bool:
     return _POSITIONAL_ATTRIBUTES_SET.issubset(node_type._attributes)
 
 
-def position_for(node):
+def position_for(node: ast.AST) -> Tuple[Any, ...]:
     return tuple(
         getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES
     )
