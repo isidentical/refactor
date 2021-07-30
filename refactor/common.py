@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from functools import lru_cache
-from typing import Any, Dict, Optional, Tuple, Type
+from typing import Any, Dict, Optional, Tuple, Type, cast
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
@@ -96,9 +96,10 @@ def has_positions(node_type: Type[ast.AST]) -> bool:
 
 
 def position_for(node: ast.AST) -> Tuple[int, int, int, int]:
-    return tuple(
+    positions = tuple(
         getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES
     )
+    return cast(Tuple[int, int, int, int], positions)
 
 
 class Singleton:
