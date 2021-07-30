@@ -57,6 +57,12 @@ class Context:
         return unparser(node)
 
     def __getitem__(self, key: str) -> Representative:
+        if key not in self.metadata:
+            raise ValueError(
+                f"{key!r} provider is not available on this context "
+                "since none of the rules from this session specified it "
+                "in it's 'context_providers' tuple."
+            )
         return self.metadata[key]
 
     @classmethod

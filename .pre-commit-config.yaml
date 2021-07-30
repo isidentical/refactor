@@ -40,5 +40,4 @@ repos:
     hooks:
     -   id: mdformat
         additional_dependencies:
-        - mdformat-black
         - mdformat_tables

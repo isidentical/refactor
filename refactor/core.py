@@ -74,6 +74,7 @@ class Rule:
         On success, it will return an `Action` instance. On fail
         it might either raise an `AssertionError` or return `None`.
         """
+        raise NotImplementedError
 
 
 @dataclass
