@@ -50,6 +50,8 @@ a = 1
 def main(d = 5):
     b = 4
     c = a + 4
+    e = 3
+    e = 4
     return c + (4 * 3) + d + e
 
 class T:
