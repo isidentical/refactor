@@ -99,28 +99,48 @@ class Ancestry(Representative):
     def marked(self, node: ast.AST) -> bool:
         return hasattr(node, "parent")
 
+    def mark(self, parent: ast.AST, field: str, node: Any) -> None:
+        if isinstance(node, ast.AST):
+            node.parent = parent
+            node.parent_field = field
+
     def annotate(self, node: ast.AST) -> None:
         if self.marked(node):
             return None
 
         node.parent = None
+        node.parent_field = None
         for parent in ast.walk(node):
-            for child in ast.iter_child_nodes(parent):
-                child.parent = parent
+            for field, value in ast.iter_fields(parent):
+                if isinstance(value, list):
+                    for item in value:
+                        self.mark(parent, field, item)
+                else:
+                    self.mark(parent, field, value)
 
     def ensure_annotated(self) -> None:
         self.annotate(self.context.tree)
 
-    def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+    def infer(self, node: ast.AST) -> Tuple[str, ast.AST]:
         self.ensure_annotated()
+        return (node.parent_field, node.parent)
 
-        return node.parent
+    def traverse(self, node: ast.AST) -> Iterable[Tuple[str, ast.AST]]:
+        cursor = node
+        while True:
+            field, parent = self.infer(cursor)
+            if parent is None:
+                break
+
+            yield field, parent
+            cursor = parent
+
+    def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+        _, parent = self.infer(node)
+        return parent
 
     def get_parents(self, node: ast.AST) -> Iterable[ast.AST]:
-        self.ensure_annotated()
-
-        parent = node
-        while parent := parent.parent:
+        for _, parent in self.traverse(node):
             yield parent
 
 
@@ -201,12 +221,12 @@ class Scope(Representative):
         if isinstance(node, ast.Module):
             raise ValueError("Can't resolve Module")
 
-        parents = tuple(
-            filter(
-                common.is_contextful,
-                self.context["ancestry"].get_parents(node),
-            )
-        )
+        parents = [
+            parent
+            for field, parent in self.context["ancestry"].traverse(node)
+            if field == "body"
+            if common.is_contextful(parent)
+        ]
 
         scope = None
         for parent in reversed(parents):
