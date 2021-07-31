@@ -14,15 +14,27 @@ class Lines(UserList):
     lines: List[str]
     trailing_newline: bool = False
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         super().__init__(self.lines)
         self.lines = self.data
 
-    def join(self):
+    def join(self) -> str:
         source = "\n".join(self.data)
         if self.trailing_newline:
             source += "\n"
         return source
+
+    def apply_indentation(
+        self, indentation: str, *, start_prefix: str = "", end_suffix: str = ""
+    ) -> None:
+        for index, line in enumerate(self.data):
+            if index == 0:
+                self.data[index] = indentation + start_prefix + line
+            else:
+                self.data[index] = indentation + line
+
+        if len(self.data) >= 1:
+            self.data[-1] += end_suffix
 
 
 def split_lines(source: str) -> Lines:

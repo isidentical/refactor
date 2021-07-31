@@ -21,6 +21,9 @@ def get_refactors(path: Path) -> Iterable[Type[Rule]]:
         if name.startswith("_") or name.endswith("_"):
             continue
 
+        if not isinstance(item, type):
+            continue
+
         if issubclass(item, Rule):
             if module := getattr(item, "__module__", None):
                 components = module.split(".")
@@ -33,7 +36,9 @@ def main() -> int:
     parser = ArgumentParser()
     parser.add_argument("src", nargs="+", type=Path)
     parser.add_argument("-d", "--refactor-file", type=Path)
-    parser.add_argument("-a", "--apply", action="store_true", default=False)
+    parser.add_argument(
+        "-n", "--dont-apply", action="store_false", default=True
+    )
 
     options = parser.parse_args()
     if options.refactor_file:
@@ -54,7 +59,7 @@ def main() -> int:
             )
 
     session = Session(list(get_refactors(refactor_file)))
-    return run_files(session, options.src, apply=options.apply, workers=1)
+    return run_files(session, options.src, apply=options.dont_apply, workers=1)
 
 
 if __name__ == "__main__":
