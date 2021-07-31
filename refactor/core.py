@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 import copy
-import textwrap
 import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -11,7 +10,7 @@ from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type, cast
 
 from refactor.ast import split_lines
 from refactor.change import Change
-from refactor.common import has_positions
+from refactor.common import find_indent, has_positions
 from refactor.context import Context, Representative, resolve_dependencies
 
 
@@ -25,12 +24,15 @@ class Action:
         view = slice(self.node.lineno - 1, self.node.end_lineno)
 
         target_lines = lines[view]
-        start_prefix = target_lines[0][: self.node.col_offset]
+        indentation, start_prefix = find_indent(
+            target_lines[0][: self.node.col_offset]
+        )
         end_prefix = target_lines[-1][self.node.end_col_offset :]
 
         replacement = split_lines(context.unparse(self.build()))
-        replacement[0] = start_prefix + replacement[0]
-        replacement[-1] += end_prefix
+        replacement.apply_indentation(
+            indentation, start_prefix=start_prefix, end_suffix=end_prefix
+        )
 
         lines[view] = replacement
         return lines.join()
@@ -58,13 +60,16 @@ class NewStatementAction(Action):
         """Add a new statement just right after the original node."""
         lines = split_lines(source)
 
-        # Calculate the last node's indent
-        indent = lines[self.node.lineno - 1][: self.node.col_offset]
-        replacement = context.unparse(self.build())
-        replacement = textwrap.indent(replacement, indent)
+        start_line = lines[self.node.lineno - 1]
+        indentation, start_prefix = find_indent(
+            start_line[: self.node.col_offset]
+        )
+
+        replacement = split_lines(context.unparse(self.build()))
+        replacement.apply_indentation(indentation, start_prefix=start_prefix)
 
         end_line = cast(int, self.node.end_lineno)
-        for line in reversed(split_lines(replacement)):
+        for line in reversed(replacement):
             lines.insert(end_line, line)
 
         return lines.join()
@@ -75,6 +80,11 @@ class Rule:
     context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
 
     context: Context
+
+    def check_file(self, path: Optional[Path]) -> bool:
+        """Check whether to process this file or not. If returned
+        a false value, the rule will be deactived for this file."""
+        return True
 
     def match(self, node: ast.AST) -> Optional[Action]:
         """Match the node against the current refactoring rule.
@@ -100,7 +110,12 @@ class Session:
             source=source,
             file=file,
         )
-        return [rule(context) for rule in self.rules]
+        return [
+            instance
+            for rule in self.rules
+            if (instance := rule(context))
+            if instance.check_file(file)
+        ]
 
     def _run(
         self,

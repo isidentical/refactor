@@ -9,3 +9,4 @@
 - Some of non-deterministic refactors (generating variations of the same code) are now early exitted.
 - `refactor.context.ScopeInfo` objects now can list definitions made in their context.
 - `refactor.context.Context` objects now store the path for the module they are processing if it is available.
+- Refactors now preserve the starting indentation for multiline statements.

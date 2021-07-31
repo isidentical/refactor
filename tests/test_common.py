@@ -7,6 +7,7 @@ from refactor.common import (
     Singleton,
     apply_condition,
     find_closest,
+    find_indent,
     has_positions,
     is_contextful,
     is_truthy,
@@ -79,6 +80,24 @@ def test_is_contextful(node, expected):
 )
 def test_pascal_to_snake(original, expected):
     assert pascal_to_snake(original) == expected
+
+
+@pytest.mark.parametrize(
+    "original, indent, prefix",
+    [
+        (str(), str(), str()),
+        (" ", " ", str()),
+        ("x", "", "x"),
+        (" x", " ", "x"),
+        ("  x", "  ", "x"),
+        ("   x", "   ", "x"),
+        ("    ", "    ", ""),
+        ("x    ", "", "x    "),
+        ("  x    ", "  ", "x    "),
+    ],
+)
+def test_find_indent(original, indent, prefix):
+    assert find_indent(original) == (indent, prefix)
 
 
 def test_find_closest():

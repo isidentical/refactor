@@ -89,10 +89,20 @@ def pascal_to_snake(name: str) -> str:
     return new_string.lower()
 
 
+def find_indent(source: str) -> Tuple[str, str]:
+    index = 0
+    for index, char in enumerate(source, 1):
+        if not char.isspace():
+            index -= 1
+            break
+    return source[:index], source[index:]
+
+
 def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     """Find the closest node against given sequence
     of targets (absolute distance from starting points)."""
-    assert len(targets) >= 0
+    if not len(targets) >= 0:
+        raise ValueError("condition failed: len(targets) >= 0")
 
     def closest(target):
         return (
