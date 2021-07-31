@@ -1,0 +1,7 @@
+- id: refactor
+  name: refactor
+  description: "refactor: Run local refactor rules"
+  entry: refactor
+  language: python
+  language_version: python3.9
+  types: [python]

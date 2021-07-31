@@ -9,6 +9,7 @@ from typing import (
     Any,
     ContextManager,
     DefaultDict,
+    Dict,
     Iterable,
     List,
     Optional,
@@ -28,7 +29,7 @@ def expand_paths(path: Path) -> Iterable[Path]:
             yield path
 
 
-def dump_stats(stats: DefaultDict[str, int]) -> str:
+def dump_stats(stats: Dict[str, int]) -> str:
     messages = []
     for status, n_files in stats.items():
         if n_files == 0:
@@ -43,23 +44,18 @@ def dump_stats(stats: DefaultDict[str, int]) -> str:
     return ", ".join(messages)
 
 
-def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
-    parser = ArgumentParser()
-    parser.add_argument("src", nargs="+", type=Path)
-    parser.add_argument("-a", "--apply", action="store_true", default=False)
-    parser.add_argument("-w", "--workers", type=int, default=4)
-
-    options = parser.parse_args()
-    files = chain.from_iterable(
-        expand_paths(source_dest) for source_dest in options.src
-    )
-
+def run_files(
+    session: Session,
+    files: Iterable[Path],
+    apply: bool = False,
+    workers: int = 1,
+) -> int:
     executor: ContextManager[Any]
-    if options.workers == 1:
+    if workers == 1:
         executor = nullcontext()
         changes = (session.run_file(file) for file in files)
     else:
-        executor = ProcessPoolExecutor(max_workers=options.workers)
+        executor = ProcessPoolExecutor(max_workers=workers)
         futures = [executor.submit(session.run_file, file) for file in files]
         changes = (future.result() for future in as_completed(futures))
 
@@ -71,17 +67,32 @@ def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
                 continue
 
             stats["reformatted"] += 1
-            if options.apply:
+            if apply:
                 print(f"reformatted {change.file!s}")
                 change.apply_diff()
             else:
                 print(change.compute_diff())
 
-        print("All done!")
-        if message := dump_stats(stats):
-            print(message)
+    print("All done!")
+    if message := dump_stats(stats):
+        print(message)
 
-    return 0
+    return stats["reformatted"] > 0
+
+
+def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
+    parser = ArgumentParser()
+    parser.add_argument("src", nargs="+", type=Path)
+    parser.add_argument("-a", "--apply", action="store_true", default=False)
+    parser.add_argument("-w", "--workers", type=int, default=4)
+
+    options = parser.parse_args()
+    files = chain.from_iterable(
+        expand_paths(source_dest) for source_dest in options.src
+    )
+    return run_files(
+        session, files, apply=options.apply, workers=options.workers
+    )
 
 
 def run(rules: List[Type[Rule]]) -> int:
