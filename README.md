@@ -1,5 +1,7 @@
 # Refactor
 
+[![PyPI version](https://badge.fury.io/py/refactor.svg)](https://badge.fury.io/py/refactor)
+
 Simple, hassle-free, dependency-free, AST based source code refactoring
 toolkit.
 
