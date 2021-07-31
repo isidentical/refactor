@@ -155,7 +155,7 @@ class ScopeType(Enum):
 class ScopeInfo(common.Singleton):
     node: ast.AST
     scope_type: ScopeType
-    parent_scope: Optional[ScopeInfo] = field(default=None, repr=False)
+    parent: Optional[ScopeInfo] = field(default=None, repr=False)
 
     def can_reach(self, other: ScopeInfo) -> bool:
         if other.scope_type is ScopeType.GLOBAL:
@@ -164,7 +164,7 @@ class ScopeInfo(common.Singleton):
             return True
 
         cursor = self
-        while cursor := cursor.parent_scope:  # type: ignore
+        while cursor := cursor.parent:  # type: ignore
             if cursor is other:
                 if other.scope_type is ScopeType.FUNCTION:
                     return True
@@ -182,7 +182,7 @@ class ScopeInfo(common.Singleton):
                         local_definitions[identifier] = node
             elif isinstance(node, ast.NamedExpr):
                 # (a := b)
-                local_definitions[node.target.id] == node
+                local_definitions[node.target.id] = node
             elif isinstance(node, ast.excepthandler):
                 # except Something as err: ...
                 if node.name is not None:
@@ -195,7 +195,9 @@ class ScopeInfo(common.Singleton):
                 # with x as (y, z): ...
                 for item in node.items:
                     if item.optional_vars:
-                        for identifier in common.unpack_lhs(item):
+                        for identifier in common.unpack_lhs(
+                            item.optional_vars
+                        ):
                             local_definitions[identifier] = node
             elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
                 # for a, b in c: ...
@@ -206,11 +208,34 @@ class ScopeInfo(common.Singleton):
             ):
                 # def something(): ...
                 local_definitions[node.name] = node
-
-        if isinstance(node, ast.arg):
-            local_definitions[node.arg] = node
+            elif isinstance(node, ast.arg):
+                local_definitions[node.arg] = node
 
         return local_definitions
+
+    @cached_property
+    def name(self):
+        if self.scope_type is ScopeType.GLOBAL:
+            return "<global>"
+
+        parts = []
+
+        if hasattr(self.node, "name"):
+            parts.append(self.node.name)
+        elif isinstance(self.node, ast.Lambda):
+            parts.append("<lambda>")
+        else:
+            parts.append("<" + type(self.node).__name__.lower() + ">")
+
+        if (
+            self.parent is not None
+            and self.parent.scope_type is not ScopeType.GLOBAL
+        ):
+            if self.parent.scope_type is ScopeType.FUNCTION:
+                parts.append("<locals>")
+            parts.append(self.parent.name)
+
+        return ".".join(reversed(parts))
 
 
 class Scope(Representative):
@@ -224,8 +249,8 @@ class Scope(Representative):
         parents = [
             parent
             for field, parent in self.context["ancestry"].traverse(node)
-            if field == "body"
             if common.is_contextful(parent)
+            if field == "body" or common.is_comprehension(parent)
         ]
 
         scope = None

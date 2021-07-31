@@ -140,7 +140,6 @@ def unpack_lhs(node: ast.AST) -> Iterator[str]:
 def walk_scope(node: ast.AST) -> Iterator[ast.AST]:
     """Like regular ast.walk() but only walks within the
     current scope."""
-    assert hasattr(node, "body")
 
     todo = deque(_walker(node))
     while todo:
@@ -154,7 +153,19 @@ def _walker(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
     yield from ast.iter_child_nodes(node)
 
 
-@_walker.register(ast.Lambda)
+# TODO: Symbol table leaks assignment expressions to
+# the next suitable context if they are used within
+# comprehensions.
+@_walker.register(ast.Module)
+@_walker.register(ast.SetComp)
+@_walker.register(ast.ListComp)
+@_walker.register(ast.DictComp)
+@_walker.register(ast.GeneratorExp)
+def _walk_ignore(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
+    if not top_level:
+        yield from ast.iter_child_nodes(node)
+
+
 @_walker.register(ast.FunctionDef)
 @_walker.register(ast.AsyncFunctionDef)
 def _walk_func(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
@@ -166,6 +177,16 @@ def _walk_func(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
     else:
         yield from _walk_args(node.args)
         yield from node.body
+
+
+@_walker.register(ast.Lambda)
+def _walk_lambda(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
+    if top_level:
+        yield from node.args.defaults
+        yield from node.args.kw_defaults
+    else:
+        yield from _walk_args(node.args)
+        yield node.body
 
 
 @_walker.register(ast.ClassDef)
