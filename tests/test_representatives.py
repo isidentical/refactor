@@ -98,15 +98,19 @@ def test_scope():
 
     # Can access global!
     assert cursors["a"].can_reach(definitions["a"])
+    assert definitions["a"].definitions.keys() == {"a", "B", "something"}
 
     # Can't access class-local
     assert not cursors["b"].can_reach(definitions["b"])
+    assert definitions["b"].definitions.keys() == {"b", "foo"}
 
     # Can access nonlocal variable
     assert cursors["c"].can_reach(definitions["c"])
+    assert definitions["c"].definitions.keys() == {"self", "c", "bar"}
 
     # Can access local variable
     assert cursors["d"].can_reach(definitions["d"])
+    assert definitions["d"].definitions.keys() == {"d"}
 
     # Every variable can access the scope they are defined in
     for name, node_scope in find_calls(tree, "self_read", scope):
@@ -118,6 +122,126 @@ def test_scope():
 
     with pytest.raises(ValueError):
         scope.resolve(tree)
+
+
+def test_scope_definitions():
+    context = get_context(
+        textwrap.dedent(
+            """
+            import g_i
+            import g_i_1, g_i.d
+
+            from fi import g_fi_1
+            from fi.d import g_fi_2, g_fi_3
+
+            g_a = 1
+            g_a_1 = g_a_2 = 2
+            g_a_2 = 3
+            accessor()
+
+            def g_f(f_arg, *, f_arg1 = (g_a_4 := something)) -> (g_a_5 := other):
+                object.d = 1
+                f_loc, f_loc_1 = (1, 2)
+                f_loc_2 = lambda: (l_loc := 1) and accessor()
+
+                import f_i
+                accessor()
+
+                return [accessor() for comp_1 in y for comp_2 in z]
+
+            class g_c:
+                c_a = 1
+                c_a_1, c_a_2 = meth_factory(c_a_3 := d)
+
+                accessor()
+
+                def c_f():
+                    c_f.d = 3
+                    for f_for_a, f_for_b in c:
+                        with x as (f_a.d, f_a.d.d1.d2):
+                            pass
+                        accessor()
+            """
+        ),
+        Scope,
+    )
+
+    tree = context.tree
+    scope = context.metadata["scope"]
+
+    accessors = [
+        node for node in ast.walk(tree) if ast.unparse(node) == "accessor()"
+    ]
+
+    scopes = {
+        scope_info.name: scope_info
+        for scope_info in map(scope.resolve, accessors)
+    }
+
+    assert scopes.keys() == {
+        "<global>",
+        "g_f",
+        "g_c",
+        "g_c.c_f",
+        "g_f.<locals>.<lambda>",
+        "g_f.<locals>.<listcomp>",
+    }
+
+    assert scopes["<global>"].definitions.keys() == {
+        "g_i",
+        "g_i_1",
+        "g_i.d",
+        "g_fi_1",
+        "g_fi_2",
+        "g_fi_3",
+        "g_a",
+        "g_a_1",
+        "g_a_2",
+        "g_f",
+        "g_c",
+        "g_a_4",
+        "g_a_5",
+    }
+    assert scopes["g_f"].definitions.keys() == {
+        "object.d",
+        "f_loc",
+        "f_loc_1",
+        "f_loc_2",
+        "f_i",
+        "f_arg",
+        "f_arg1",
+    }
+    assert scopes["g_c"].definitions.keys() == {
+        "c_a",
+        "c_a_1",
+        "c_a_2",
+        "c_f",
+        "c_a_3",
+    }
+    assert scopes["g_c.c_f"].definitions.keys() == {
+        "c_f.d",
+        "f_for_a",
+        "f_for_b",
+        "f_a.d",
+        "f_a.d.d1.d2",
+    }
+    assert scopes["g_f.<locals>.<lambda>"].definitions.keys() == {"l_loc"}
+    assert scopes["g_f.<locals>.<listcomp>"].definitions.keys() == {
+        "comp_1",
+        "comp_2",
+    }
+
+    [g_a_1] = scopes["<global>"].definitions["g_a_1"]
+    g_a_2 = scopes["<global>"].definitions["g_a_2"]
+
+    assert isinstance(g_a_1, ast.Assign)
+    assert ast.unparse(g_a_1.value) == "2"
+
+    assert isinstance(g_a_2, list) and len(g_a_2) == 2
+    assert [ast.unparse(definition.value) for definition in g_a_2] == [
+        "2",
+        "3",
+    ]
 
 
 def test_custom_unparser():
