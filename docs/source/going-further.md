@@ -1,4 +1,4 @@
-# Going Further
+# Representatives
 
 For more complicated refactoring rules, sometimes you need to
 collect more information about the surrounding code. Rules have
@@ -26,10 +26,12 @@ For example;
 ```python
 a = 1
 
-def foo(d = 5):
+def main(d = 5):
     b = 4
     c = a + b
-    return c + (b * 3) + d
+    e = 3
+    e = 4
+    return c + (b * 3) + d + e
 
 class T:
     b = 2
@@ -45,10 +47,10 @@ The code above can be transformed to this;
 ```python
 a = 1
 
-def foo(d = 5):
+def main(d = 5):
     b = 4
     c = a + 4
-    return c + (4 * 3) + d
+    return c + (4 * 3) + d + e
 
 class T:
     b = 2
@@ -59,136 +61,105 @@ class T:
         print(a + b + 3 + d)
 ```
 
-Though for making such a change, we need to know where the definition is for a
-particular `ast.Name` node. This is where `Representative`s comes to the play.
-Let's create an observer which would offer a method called `collect()` where
-you'd pass the scope you are in, and it would return a dictionary of all definitions.
+There are a few points we need to make sure though. First, we need a way of collecting variables
+that we only have access from their usage site (e.g we can't reach the `c` in `T.foo` from `main`). Second
+we need to make sure that the variables we are using don't get changed during the function's life time (e.g
+`e` is first set to `3` but then it becomes `4`).
 
-```python
-class Assignments(refactor.Representative):
-    
-    def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
-        ...
-```
+Luckily basic scope management operations comes as one of the builtin representatives (`refactor.context.Scope`).
+We could simply plug it in by adding it to a tuple called `context_providers` on the rules we need them;
 
-One thing that we need for a case like this is, we want to be able to infer
-the scope of particular `AST` nodes, so we will declare a tuple of context providers
-that we need in the class definition:
+```py
+import ast
 
-```python
+import refactor
 from refactor.context import Scope
 
-class Assignments(refactor.Representative):
+class PropagateConstants(refactor.Rule):
+    
     context_providers = (Scope,)
-    
-    def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
-        ...
 ```
 
-If any rule uses our `Assignments` representative, the context object will also
-search for any of the representatives that `Assignments` need in the `context_providers`
-and prepare them. Next up, let's search for all definitions within the given scope;
+Let's write the matcher for this. We are going to look for name loads (so that we won't replace the left hand side
+for assignments);
 
-```python
-    def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
-        assignments = defaultdict(list)
-        for node in ast.walk(scope.node):
-            # Check whether this is a simple assignment to a name
-            if (
-                isinstance(node, ast.Assign)
-                and len(node.targets) == 1
-                and isinstance(target := node.targets[0], ast.Name)
-            ):
-```
-
-This would find all assignments done by `a = b`, which is the simplest form
-that we are accepting right now. Obviously there are many ways that a name
-can be bound to a value in Python (e.g imports, with targets, for targets etc.)
-but for the sake of simplicity. One thing to consider here is that, when we are
-walking, it will also yield nodes from child contexts (e.g if you have another
-function defined within this one, the assignments from that function will also
-be yielded), for fixing this issue we can simply resolve the scope of this
-assignment and check whether we can reach it or not;
-
-```python
-    def collect(self, scope: ScopeInfo) -> DefaultDict[str, List[ast.Assign]]:
-        assignments = defaultdict(list)
-        for node in ast.walk(scope.node):
-            # Check whether this is a simple assignment to a name
-            if (
-                isinstance(node, ast.Assign)
-                and len(node.targets) == 1
-                and isinstance(target := node.targets[0], ast.Name)
-            ):
-                # Check whether we can reach this assignment or not.
-                # For example there might be child functions where the
-                # definition is unreachable for us.
-                assignment_scope = self.context['scope'].resolve(node)
-                if scope.can_reach(assignment_scope):
-                    assignments[target.id].append(node)
-        
-        return assignments
-
-```
-
-If all goes fine, we'd return the dictionary we prepared. The next step is
-writing the actual rule, which is going to be very simple;
-
-```python
-class PropagationRule(refactor.Rule):
-    
-    context_providers = (Assignments, Scope)
-    
-    def match(self, node: ast.AST) -> refactor.Action:
+```py
+    def match(self, node):
         assert isinstance(node, ast.Name)
         assert isinstance(node.ctx, ast.Load)
-            
 ```
 
-We'll match against a simple name on a load context, we don't want to replace assignment
-targets with the constant literals :) Now it's time to resolve the name we have and check
-whether it is assigned only once, and whether the value it is bound to is a constant
+Then we will get the current `scope` (`refactor.context.ScopeInfo`) from the `Scope` provider. We can access it through
+`context`:
 
-```python
-        # The name should be defined in the current scope
-        # and there shouldn't be any overrides
-        assert len(assignments) == 1
-
-        # The value should be a constant, so that we can safely propagate
-        [assignment] = assignments
-        assert isinstance(value := assignment.value, ast.Constant)
+```py
+        current_scope = self.context['scope'].resolve(node)
 ```
 
-And if that is the case, we can simply return a `ReplacementAction` which would replace
-the `ast.Name` node with the `ast.Constant` node;
+The convention for representatives is that, unless they define a custom `name` descriptor, it is the snake case format
+of their type name. For example `Scope` is `'scope'`, `ImportFinder` is `'import_finder'` and so on. The `Scope` representative
+offers a method called `resolve()` which basically takes the node and returns `ScopeInfo`. With looking that `ScopeInfo`, we can
+check whether the name we are looking for defined in that scope
 
-```python
+```py
+        assert current_scope.defines(node.id)
+```
+
+And if it is, we can get the definition
+
+```py
+        definitions = current_scope.definitions[node.id]
+```
+
+Obviously a name can be defined muliplte times, so `definitions` is always a list. We need to ensure it a list of a single
+assignment
+
+```py
+        assert len(definitions) == 1
+        assert isinstance(
+            definition := definitions[0],
+            ast.Assign
+        )
+```
+
+And finally we need to check whether the value for this assignment is a constant, and if it is return a `ReplacementAction`;
+
+```py
+        assert isinstance(value := definition.value, ast.Constant)
+
         return refactor.ReplacementAction(node, value)
 ```
 
-Let's give it a try:
+### Appendix A: Full Script
 
-```diff
- $ python examples/propagate.py test.py                  
---- test.py
-+++ test.py
+```py
+import ast
 
-@@ -2,13 +2,13 @@
+import refactor
+from refactor.context import Scope
 
- def foo(d = 5):
-     b = 4
--    c = a + b
--    return c + (b * 3) + d
-+    c = a + 4
-+    return c + (4 * 3) + d
- 
- class T:
-     b = 2
--    print(a + b + c)
-+    print(a + 2 + c)
-     
-     def foo():
-         c = 3
--        print(a + b + c + d)
-+        print(a + b + 3 + d)
+class PropagateConstants(refactor.Rule):
+
+    context_providers = (Scope,)
+
+    def match(self, node):
+        assert isinstance(node, ast.Name)
+        assert isinstance(node.ctx, ast.Load)
+
+        current_scope = self.context['scope'].resolve(node)
+        assert current_scope.defines(node.id)
+
+        definitions = current_scope.definitions[node.id]
+
+        assert len(definitions) == 1
+        assert isinstance(
+            definition := definitions[0],
+            ast.Assign
+        )
+        assert isinstance(value := definition.value, ast.Constant)
+
+        return refactor.ReplacementAction(node, value)
+
+if __name__ == "__main__":
+    refactor.run(rules=[PropagateConstants])
 ```

@@ -173,6 +173,9 @@ class ScopeInfo(common.Singleton):
         else:
             return False
 
+    def defines(self, name: str) -> bool:
+        return name in self.definitions
+
     @cached_property
     def definitions(self) -> Dict[str, List[ast.AST]]:
         local_definitions: DefaultDict[str, List[ast.AST]] = defaultdict(list)
