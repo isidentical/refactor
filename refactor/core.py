@@ -91,15 +91,21 @@ class Session:
 
     rules: List[Type[Rule]] = field(default_factory=list)
 
-    def _initialize_rules(self, tree: ast.Module, source: str) -> List[Rule]:
+    def _initialize_rules(
+        self, tree: ast.Module, source: str, file: Optional[Path]
+    ) -> List[Rule]:
         context = Context.from_dependencies(
-            resolve_dependencies(self.rules), tree=tree, source=source
+            resolve_dependencies(self.rules),
+            tree=tree,
+            source=source,
+            file=file,
         )
         return [rule(context) for rule in self.rules]
 
     def _run(
         self,
         source: str,
+        file: Optional[Path] = None,
         *,
         _changed: bool = False,
         _known_sources: FrozenSet[str] = frozenset(),
@@ -113,7 +119,7 @@ class Session:
                 raise ValueError("Generated source is unparsable") from exc
 
         _known_sources = frozenset((*_known_sources, source))
-        rules = self._initialize_rules(tree, source)
+        rules = self._initialize_rules(tree, source, file)
 
         for node in ast.walk(tree):
             if not has_positions(type(node)):  # type: ignore
@@ -132,7 +138,7 @@ class Session:
 
         return source, _changed
 
-    def run(self, source: str) -> str:
+    def run(self, source: str, *, file: Optional[Path] = None) -> str:
         """Refactor the given string with the rules bound to
         this session."""
 
@@ -150,7 +156,7 @@ class Session:
         except (SyntaxError, UnicodeDecodeError):
             return None
 
-        new_source, is_changed = self._run(source)
+        new_source, is_changed = self._run(source, file=file)
 
         if is_changed:
             return Change(file, source, new_source)

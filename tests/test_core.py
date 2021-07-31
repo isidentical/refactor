@@ -154,7 +154,14 @@ def test_session_simple(source, rules, expected_source):
 
 
 def test_session_run_file(tmp_path):
-    session = Session([PlaceholderReplacer])
+    paths = set()
+
+    class PathCollector(Rule):
+        def match(self, node):
+            if self.context.file is not None:
+                paths.add(self.context.file)
+
+    session = Session([PlaceholderReplacer, PathCollector])
 
     file_1 = tmp_path / "test.py"
     file_2 = tmp_path / "test2.py"
@@ -164,6 +171,7 @@ def test_session_run_file(tmp_path):
         handle.write("something + something\n")
 
     assert session.run_file(file_1) is None
+    assert paths == {file_1}
 
     with open(file_2, "w") as handle:
         handle.write("2 + placeholder + 3")
@@ -173,11 +181,13 @@ def test_session_run_file(tmp_path):
     assert isinstance(change, Change)
     assert change.original_source == "2 + placeholder + 3"
     assert change.refactored_source == "2 + 42 + 3"
+    assert paths == {file_1, file_2}
 
     with open(file_3, "w") as handle:
         handle.write("syntax? error?")
 
     assert session.run_file(file_3) is None
+    assert paths == {file_1, file_2}
 
 
 class InvalidAction(Action):

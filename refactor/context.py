@@ -5,6 +5,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import cached_property
+from pathlib import Path
 from typing import (
     Any,
     ClassVar,
@@ -48,6 +49,7 @@ def resolve_dependencies(
 class Context:
     source: str
     tree: ast.AST
+    file: Optional[Path] = None
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
     def unparse(self, node: ast.AST) -> str:
