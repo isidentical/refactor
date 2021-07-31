@@ -1,4 +1,5 @@
 import ast
+import copy
 import textwrap
 
 import pytest
@@ -212,3 +213,23 @@ def test_session_run_deterministic():
     refactored_source, changed = session._run("2 + 2 + 3 + 4")
     assert not changed
     assert refactored_source == "2 + 2 + 3 + 4"
+
+
+class ChangeSign(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.BinOp)
+
+        new_node = copy.deepcopy(node)
+        if isinstance(node.op, ast.Add):
+            new_node.op = ast.Sub()
+        elif isinstance(node.op, ast.Sub):
+            new_node.op = ast.Add()
+        else:
+            return None
+
+        return ReplacementAction(node, new_node)
+
+
+def test_session_run_deterministic_for_on_off_rules():
+    session = Session([ChangeSign])
+    assert session.run("2 + 2") == "2 - 2"

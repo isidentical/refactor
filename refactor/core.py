@@ -7,7 +7,7 @@ import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, List, Optional, Tuple, Type, cast
+from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type, cast
 
 from refactor.ast import split_lines
 from refactor.change import Change
@@ -102,6 +102,7 @@ class Session:
         source: str,
         *,
         _changed: bool = False,
+        _known_sources: FrozenSet[str] = frozenset(),
     ) -> Tuple[str, bool]:
         try:
             tree = ast.parse(source)
@@ -111,6 +112,7 @@ class Session:
             else:
                 raise ValueError("Generated source is unparsable") from exc
 
+        _known_sources = frozenset((*_known_sources, source))
         rules = self._initialize_rules(tree, source)
 
         for node in ast.walk(tree):
@@ -121,8 +123,12 @@ class Session:
                 with suppress(AssertionError):
                     if action := rule.match(node):
                         new_source = action.apply(rule.context, source)
-                        if source != new_source:
-                            return self._run(new_source, _changed=True)
+                        if new_source not in _known_sources:
+                            return self._run(
+                                new_source,
+                                _changed=True,
+                                _known_sources=_known_sources,
+                            )
 
         return source, _changed
 
