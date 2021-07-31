@@ -106,7 +106,7 @@ def test_scope():
 
     # Can access nonlocal variable
     assert cursors["c"].can_reach(definitions["c"])
-    assert definitions["c"].definitions.keys() == {"c", "bar"}
+    assert definitions["c"].definitions.keys() == {"self", "c", "bar"}
 
     # Can access local variable
     assert cursors["d"].can_reach(definitions["d"])
@@ -135,7 +135,8 @@ def test_scope_definitions():
             from fi.d import g_fi_2, g_fi_3
 
             g_a = 1
-            g_a_1 = g_a_2 = value
+            g_a_1 = g_a_2 = 2
+            g_a_2 = 3
             accessor()
 
             def g_f(f_arg, *, f_arg1 = (g_a_4 := something)) -> (g_a_5 := other):
@@ -229,6 +230,18 @@ def test_scope_definitions():
         "comp_1",
         "comp_2",
     }
+
+    [g_a_1] = scopes["<global>"].definitions["g_a_1"]
+    g_a_2 = scopes["<global>"].definitions["g_a_2"]
+
+    assert isinstance(g_a_1, ast.Assign)
+    assert ast.unparse(g_a_1.value) == "2"
+
+    assert isinstance(g_a_2, list) and len(g_a_2) == 2
+    assert [ast.unparse(definition.value) for definition in g_a_2] == [
+        "2",
+        "3",
+    ]
 
 
 def test_custom_unparser():

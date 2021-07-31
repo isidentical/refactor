@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import ast
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import cached_property
 from typing import (
     Any,
     ClassVar,
+    DefaultDict,
     Dict,
     Iterable,
+    List,
     Optional,
     Protocol,
     Set,
@@ -172,25 +174,25 @@ class ScopeInfo(common.Singleton):
             return False
 
     @cached_property
-    def definitions(self):
-        local_definitions = {}
+    def definitions(self) -> Dict[str, List[ast.AST]]:
+        local_definitions: DefaultDict[str, List[ast.AST]] = defaultdict(list)
         for node in common.walk_scope(self.node):
             if isinstance(node, ast.Assign):
                 # a, b = c = 1
                 for target in node.targets:
                     for identifier in common.unpack_lhs(target):
-                        local_definitions[identifier] = node
+                        local_definitions[identifier].append(node)
             elif isinstance(node, ast.NamedExpr):
                 # (a := b)
-                local_definitions[node.target.id] = node
+                local_definitions[node.target.id].append(node)
             elif isinstance(node, ast.excepthandler):
                 # except Something as err: ...
                 if node.name is not None:
-                    local_definitions[node.name] = node
+                    local_definitions[node.name].append(node)
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 # import something
                 for alias in node.names:
-                    local_definitions[alias.name] = node
+                    local_definitions[alias.name].append(node)
             elif isinstance(node, (ast.With, ast.AsyncWith)):
                 # with x as (y, z): ...
                 for item in node.items:
@@ -198,23 +200,23 @@ class ScopeInfo(common.Singleton):
                         for identifier in common.unpack_lhs(
                             item.optional_vars
                         ):
-                            local_definitions[identifier] = node
+                            local_definitions[identifier].append(node)
             elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
                 # for a, b in c: ...
                 for identifier in common.unpack_lhs(node.target):
-                    local_definitions[identifier] = node
+                    local_definitions[identifier].append(node)
             elif isinstance(
                 node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
             ):
                 # def something(): ...
-                local_definitions[node.name] = node
+                local_definitions[node.name].append(node)
             elif isinstance(node, ast.arg):
-                local_definitions[node.arg] = node
+                local_definitions[node.arg].append(node)
 
-        return local_definitions
+        return dict(local_definitions)
 
     @cached_property
-    def name(self):
+    def name(self) -> str:
         if self.scope_type is ScopeType.GLOBAL:
             return "<global>"
 
