@@ -3,7 +3,18 @@ from __future__ import annotations
 import ast
 from collections import deque
 from functools import cache, singledispatch
-from typing import Any, Dict, Iterator, List, Optional, Tuple, Type, cast
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    List,
+    Optional,
+    Tuple,
+    Type,
+    cast,
+)
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
@@ -37,38 +48,27 @@ def is_truthy(op: ast.cmpop) -> Optional[bool]:
     return _OPERATOR_MAP.get(type(op))
 
 
-@cache
-def _is_comprehension(node_type: Type[ast.AST]) -> bool:
-    return issubclass(
-        node_type, (ast.SetComp, ast.ListComp, ast.DictComp, ast.GeneratorExp)
-    )
+def _type_checker(
+    *types: Type, binders: Iterable[Callable[[Type], bool]] = ()
+) -> Callable[[Any], bool]:
+    @cache
+    def checker(node_type: Type) -> bool:
+        result = issubclass(node_type, types)
+        return result or any(binder(node_type) for binder in binders)
+
+    def top_level_checker(node: Any) -> bool:
+        return checker(type(node))  # type: ignore
+
+    return top_level_checker
 
 
-def is_comprehension(node: ast.AST) -> bool:
-    """Check if the node is a comprehension"""
-    return _is_comprehension(type(node))  # type: ignore
-
-
-@cache
-def _is_contextful(node_type: Type[ast.AST]) -> bool:
-    return issubclass(
-        node_type,
-        (
-            ast.Module,
-            ast.ClassDef,
-            ast.FunctionDef,
-            ast.AsyncFunctionDef,
-            ast.Lambda,
-        ),
-    ) or _is_comprehension(
-        node_type  # type: ignore
-    )
-
-
-def is_contextful(node: ast.AST) -> bool:
-    """Check if the node is a context starter (e.g
-    a function definition)."""
-    return _is_contextful(type(node))  # type: ignore
+is_comprehension = _type_checker(
+    ast.SetComp, ast.ListComp, ast.DictComp, ast.GeneratorExp
+)
+is_function = _type_checker(ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
+is_contextful = _type_checker(
+    ast.Module, ast.ClassDef, binders=[is_function, is_comprehension]
+)
 
 
 def pascal_to_snake(name: str) -> str:
