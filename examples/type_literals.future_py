@@ -1,5 +1,5 @@
 # Replace calls like type('') or type({}) with the actual
-# types like str or dict. 
+# types like str or dict.
 
 import ast
 import refactor
@@ -38,7 +38,11 @@ class ReplaceTypeLiterals(Rule):
             ('type', 'type-function-redefined')
         ]:
             if name in scope.definitions:
-                line = scope.definitions[name].lineno
+                definition = scope.definitions[name]
+                if isinstance(definition, list):
+                    definition = definition[0]
+
+                line = definition.lineno
                 print(f'skipping: {reason} (on line {line})')
                 return None
 
