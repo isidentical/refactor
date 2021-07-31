@@ -1,15 +1,17 @@
 from __future__ import annotations
 
 import ast
-from collections import deque
+from collections import defaultdict, deque
 from dataclasses import dataclass, field
 from enum import Enum, auto
 from functools import cached_property
 from typing import (
     Any,
     ClassVar,
+    DefaultDict,
     Dict,
     Iterable,
+    List,
     Optional,
     Protocol,
     Set,
@@ -18,8 +20,8 @@ from typing import (
     cast,
 )
 
+import refactor.common as common
 from refactor.ast import Unparser, UnparserBase
-from refactor.common import Singleton, is_contextful, pascal_to_snake
 
 
 class Dependable(Protocol):
@@ -92,35 +94,55 @@ class Representative:
         if self_type is Representative:
             return "<base>"
         else:
-            return pascal_to_snake(self_type.__name__)
+            return common.pascal_to_snake(self_type.__name__)
 
 
 class Ancestry(Representative):
     def marked(self, node: ast.AST) -> bool:
         return hasattr(node, "parent")
 
+    def mark(self, parent: ast.AST, field: str, node: Any) -> None:
+        if isinstance(node, ast.AST):
+            node.parent = parent
+            node.parent_field = field
+
     def annotate(self, node: ast.AST) -> None:
         if self.marked(node):
             return None
 
         node.parent = None
+        node.parent_field = None
         for parent in ast.walk(node):
-            for child in ast.iter_child_nodes(parent):
-                child.parent = parent
+            for field, value in ast.iter_fields(parent):
+                if isinstance(value, list):
+                    for item in value:
+                        self.mark(parent, field, item)
+                else:
+                    self.mark(parent, field, value)
 
     def ensure_annotated(self) -> None:
         self.annotate(self.context.tree)
 
-    def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+    def infer(self, node: ast.AST) -> Tuple[str, ast.AST]:
         self.ensure_annotated()
+        return (node.parent_field, node.parent)
 
-        return node.parent
+    def traverse(self, node: ast.AST) -> Iterable[Tuple[str, ast.AST]]:
+        cursor = node
+        while True:
+            field, parent = self.infer(cursor)
+            if parent is None:
+                break
+
+            yield field, parent
+            cursor = parent
+
+    def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+        _, parent = self.infer(node)
+        return parent
 
     def get_parents(self, node: ast.AST) -> Iterable[ast.AST]:
-        self.ensure_annotated()
-
-        parent = node
-        while parent := parent.parent:
+        for _, parent in self.traverse(node):
             yield parent
 
 
@@ -128,13 +150,14 @@ class ScopeType(Enum):
     GLOBAL = auto()
     CLASS = auto()
     FUNCTION = auto()
+    COMPREHENSION = auto()
 
 
 @dataclass(unsafe_hash=True)
-class ScopeInfo(Singleton):
+class ScopeInfo(common.Singleton):
     node: ast.AST
     scope_type: ScopeType
-    parent_scope: Optional[ScopeInfo] = None
+    parent: Optional[ScopeInfo] = field(default=None, repr=False)
 
     def can_reach(self, other: ScopeInfo) -> bool:
         if other.scope_type is ScopeType.GLOBAL:
@@ -143,12 +166,81 @@ class ScopeInfo(Singleton):
             return True
 
         cursor = self
-        while cursor := cursor.parent_scope:  # type: ignore
+        while cursor := cursor.parent:  # type: ignore
             if cursor is other:
                 if other.scope_type is ScopeType.FUNCTION:
                     return True
         else:
             return False
+
+    def defines(self, name: str) -> bool:
+        return name in self.definitions
+
+    @cached_property
+    def definitions(self) -> Dict[str, List[ast.AST]]:
+        local_definitions: DefaultDict[str, List[ast.AST]] = defaultdict(list)
+        for node in common.walk_scope(self.node):
+            if isinstance(node, ast.Assign):
+                # a, b = c = 1
+                for target in node.targets:
+                    for identifier in common.unpack_lhs(target):
+                        local_definitions[identifier].append(node)
+            elif isinstance(node, ast.NamedExpr):
+                # (a := b)
+                local_definitions[node.target.id].append(node)
+            elif isinstance(node, ast.excepthandler):
+                # except Something as err: ...
+                if node.name is not None:
+                    local_definitions[node.name].append(node)
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                # import something
+                for alias in node.names:
+                    local_definitions[alias.name].append(node)
+            elif isinstance(node, (ast.With, ast.AsyncWith)):
+                # with x as (y, z): ...
+                for item in node.items:
+                    if item.optional_vars:
+                        for identifier in common.unpack_lhs(
+                            item.optional_vars
+                        ):
+                            local_definitions[identifier].append(node)
+            elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
+                # for a, b in c: ...
+                for identifier in common.unpack_lhs(node.target):
+                    local_definitions[identifier].append(node)
+            elif isinstance(
+                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
+            ):
+                # def something(): ...
+                local_definitions[node.name].append(node)
+            elif isinstance(node, ast.arg):
+                local_definitions[node.arg].append(node)
+
+        return dict(local_definitions)
+
+    @cached_property
+    def name(self) -> str:
+        if self.scope_type is ScopeType.GLOBAL:
+            return "<global>"
+
+        parts = []
+
+        if hasattr(self.node, "name"):
+            parts.append(self.node.name)
+        elif isinstance(self.node, ast.Lambda):
+            parts.append("<lambda>")
+        else:
+            parts.append("<" + type(self.node).__name__.lower() + ">")
+
+        if (
+            self.parent is not None
+            and self.parent.scope_type is not ScopeType.GLOBAL
+        ):
+            if self.parent.scope_type is ScopeType.FUNCTION:
+                parts.append("<locals>")
+            parts.append(self.parent.name)
+
+        return ".".join(reversed(parts))
 
 
 class Scope(Representative):
@@ -159,9 +251,12 @@ class Scope(Representative):
         if isinstance(node, ast.Module):
             raise ValueError("Can't resolve Module")
 
-        parents = tuple(
-            filter(is_contextful, self.context["ancestry"].get_parents(node))
-        )
+        parents = [
+            parent
+            for field, parent in self.context["ancestry"].traverse(node)
+            if common.is_contextful(parent)
+            if field == "body" or common.is_comprehension(parent)
+        ]
 
         scope = None
         for parent in reversed(parents):
@@ -173,6 +268,8 @@ class Scope(Representative):
                 parent, (ast.FunctionDef, ast.AsyncFunctionDef, ast.Lambda)
             ):
                 scope_type = ScopeType.FUNCTION
+            elif common.is_comprehension(parent):
+                scope_type = ScopeType.COMPREHENSION
 
             scope = ScopeInfo(parent, scope_type, scope)
 
