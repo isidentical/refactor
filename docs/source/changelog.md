@@ -1,6 +1,6 @@
 # Changelog
 
-## in development
+## 0.3.0
 
 - `refactor.NewStatementAction` now auto indents the new statement by looking at previous statement's start prefix.
 - Refactors now preserve the trailing new line.
