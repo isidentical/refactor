@@ -120,9 +120,9 @@ class Session:
             for rule in rules:
                 with suppress(AssertionError):
                     if action := rule.match(node):
-                        return self._run(
-                            action.apply(rule.context, source), _changed=True
-                        )
+                        new_source = action.apply(rule.context, source)
+                        if source != new_source:
+                            return self._run(new_source, _changed=True)
 
         return source, _changed
 

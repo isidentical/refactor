@@ -199,3 +199,16 @@ def test_session_invalid_source_generated(tmp_path):
         assert session.run("2 + 2")
 
     assert session.run("2 + ??") == "2 + ??"
+
+
+class RecursiveRule(Rule):
+    def match(self, node):
+        return Action(node)
+
+
+def test_session_run_deterministic():
+    session = Session([RecursiveRule])
+
+    refactored_source, changed = session._run("2 + 2 + 3 + 4")
+    assert not changed
+    assert refactored_source == "2 + 2 + 3 + 4"
