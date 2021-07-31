@@ -51,6 +51,9 @@ def is_truthy(op: ast.cmpop) -> Optional[bool]:
 def _type_checker(
     *types: Type, binders: Iterable[Callable[[Type], bool]] = ()
 ) -> Callable[[Any], bool]:
+
+    binders = [getattr(binder, "fast_checker", binder) for binder in binders]
+
     @cache
     def checker(node_type: Type) -> bool:
         result = issubclass(node_type, types)
@@ -58,6 +61,8 @@ def _type_checker(
 
     def top_level_checker(node: Any) -> bool:
         return checker(type(node))  # type: ignore
+
+    top_level_checker.fast_checker = checker
 
     return top_level_checker
 
