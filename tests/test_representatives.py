@@ -11,6 +11,7 @@ from refactor.context import (
     Scope,
     resolve_dependencies,
 )
+from refactor.core import Rule
 
 
 def get_context(source, *representatives):
@@ -257,3 +258,87 @@ def test_custom_unparser():
 
     context = get_context("hey", StaticUnparser)
     assert context.unparse(ast.parse("hey")) == "<chulak>"
+
+
+def test_dependency_resolver():
+    class Rep1(Representative):
+        pass
+
+    class Rep2(Representative):
+        context_providers = (Rep1,)
+
+    class Rep3(Representative):
+        context_providers = (Rep2,)
+
+    class Rule1(Rule):
+        pass
+
+    class Rule2(Rule):
+        context_providers = (Rep1,)
+
+    class Rule3(Rule):
+        context_providers = (Rep1,)
+
+    class Rule4(Rule):
+        context_providers = (Rep1, Rep2)
+
+    class Rule5(Rule):
+        context_providers = (Rep2,)
+
+    class Rule6(Rule):
+        context_providers = (Rep3,)
+
+    assert resolve_dependencies([Rule1]) == set()
+    assert resolve_dependencies([Rule2]) == {Rep1}
+    assert resolve_dependencies([Rule3]) == {Rep1}
+    assert resolve_dependencies([Rule4]) == {Rep1, Rep2}
+    assert resolve_dependencies([Rule5]) == {Rep1, Rep2}
+    assert resolve_dependencies([Rule6]) == {Rep1, Rep2, Rep3}
+
+    assert resolve_dependencies([Rule1, Rule2]) == {Rep1}
+    assert resolve_dependencies([Rule2, Rule3]) == {Rep1}
+    assert resolve_dependencies([Rule1, Rule2, Rule3]) == {Rep1}
+    assert resolve_dependencies([Rule1, Rule2, Rule4]) == {Rep1, Rep2}
+    assert resolve_dependencies([Rule1, Rule5]) == {Rep1, Rep2}
+    assert resolve_dependencies([Rule1, Rule6]) == {Rep1, Rep2, Rep3}
+    assert resolve_dependencies([Rule1, Rule2, Rule5, Rule6]) == {
+        Rep1,
+        Rep2,
+        Rep3,
+    }
+
+
+def test_dependency_resolver_recursion():
+    class Rep1(Representative):
+        pass
+
+    Rep1.context_providers = (Rep1,)
+
+    class Rep2(Representative):
+        pass
+
+    class Rep3(Representative):
+        pass
+
+    Rep2.context_providers = (Rep3,)
+    Rep3.context_providers = (Rep2,)
+
+    class Rep4(Representative):
+        context_providers = (Rep2, Rep1)
+
+    class Rule1(Rule):
+        context_providers = (Rep1,)
+
+    class Rule2(Rule):
+        context_providers = (Rep2,)
+
+    class Rule3(Rule):
+        context_providers = (Rep3,)
+
+    class Rule4(Rule):
+        context_providers = (Rep4,)
+
+    assert resolve_dependencies([Rule1]) == {Rep1}
+    assert resolve_dependencies([Rule2]) == {Rep2, Rep3}
+    assert resolve_dependencies([Rule3]) == {Rep2, Rep3}
+    assert resolve_dependencies([Rule4]) == {Rep1, Rep2, Rep3, Rep4}
