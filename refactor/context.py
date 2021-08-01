@@ -37,7 +37,11 @@ def resolve_dependencies(
     pool = deque(dependables)
     while pool:
         dependable = pool.pop()
-        pool.extendleft(dependable.context_providers)
+        pool.extendleft(
+            dependency
+            for dependency in dependable.context_providers
+            if dependency not in dependencies
+        )
 
         if issubclass(dependable, Representative):
             dependencies.add(cast(Type[Representative], dependable))
