@@ -113,8 +113,7 @@ class Session:
         return [
             instance
             for rule in self.rules
-            if (instance := rule(context))
-            if instance.check_file(file)
+            if (instance := rule(context)).check_file(file)
         ]
 
     def _run(
@@ -133,7 +132,7 @@ class Session:
             else:
                 raise ValueError("Generated source is unparsable") from exc
 
-        _known_sources = frozenset((*_known_sources, source))
+        _known_sources |= {source}
         rules = self._initialize_rules(tree, source, file)
 
         for node in ast.walk(tree):
