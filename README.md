@@ -28,11 +28,11 @@ import ast
 from refactor import Rule, ReplacementAction, run
 
 class Replace(Rule):
-    
+
     def match(self, node):
         assert isinstance(node, ast.Name)
         assert node.id == 'placeholder'
-        
+
         replacement = ast.Constant(42)
         return ReplacementAction(node, replacement)
         
@@ -48,7 +48,7 @@ If we run this on a file, `refactor` will print the diff by default;
 
 @@ -1,11 +1,11 @@
 
- def main():
+def main():
 -    print(placeholder * 3 + 2)
 -    print(2 +               placeholder      + 3)
 +    print(42 * 3 + 2)
@@ -60,14 +60,28 @@ If we run this on a file, `refactor` will print the diff by default;
          other_thing
 -    print(placeholder)
 +    print(42)
- 
- if __name__ == "__main__":
+
+if __name__ == "__main__":
      main()
 ```
 
-> As stated above, refactor's scope is usually small stuff, so if you
-> want to do full program transformations we highly advise you to look
-> at CST-based solutions like
-> [parso](https://github.com/davidhalter/parso),
-> [LibCST](https://github.com/Instagram/LibCST) and
-> [Fixit](https://github.com/Instagram/Fixit)
+### CST vs AST
+
+It is a common misconception that AST *should not* be used for source code refactorings since
+it doesn't preserve any of the stylings about the code that is visible to humans. Even though
+this statement is partially true, it is wrong on the point of "we can't/shouldn't do any transformations
+through AST". As explained above, we aim to tackle the smaller and simpler problems (e.g refactoring
+simple expressions statements) and while doing that we preserve all details about the surrounding code. And
+even for the stuff in the same line, we preserve as much as we can (e.g refactoring a simple name between 2 different
+operations won't change any style). It is obviously possible to abuse this and do full source refactors, in that case,
+you will lose most of the information, which even though is not preferred, might apply to some use cases (e.g
+feeding the output directly to the interpreter).
+
+We have some great CST implementations ([parso](https://github.com/davidhalter/parso),
+[LibCST](https://github.com/Instagram/LibCST)) and even though they are pretty useful for
+doing major transformations, they can't be expected to keep up with the latest syntax updates
+on the upstream python. It is also an extra layer of indirection in some cases, considering that
+it is a general practice to do analysis on the AST and refactoring on the CST and for most of the
+cases these would be interchangeable through `refactor`. In any scenario, I'd highly recommend you
+to check out these libraries (as well as some tools like [Fixit](https://github.com/Instagram/Fixit))
+if you are interested in doing a considerable amount of source code processing.
