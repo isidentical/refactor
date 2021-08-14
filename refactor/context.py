@@ -57,12 +57,9 @@ class Context:
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
     def unparse(self, node: ast.AST) -> str:
-        if rep := self.metadata.get("unparse"):
-            unparser = rep.unparse
-        else:
-            unparser = ast.unparse
-
-        return unparser(node)
+        base = self.metadata.get("unparse", ast)
+        assert hasattr(base, "unparse")
+        return base.unparse(node)  # type: ignore
 
     def __getitem__(self, key: str) -> Representative:
         if key not in self.metadata:
