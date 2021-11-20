@@ -18,55 +18,62 @@ fake_ctx = Context(source="<test>", tree=ast.AST())
 
 
 @pytest.mark.parametrize(
-    "source, target_func, replacement, expected",
+    "source, expected, target_func, replacement",
     [
         (
             "2 + 2 == 4",
+            "2 + 2 == 5",
             lambda mod: mod.body[0].value.comparators[0],
             ast.Constant(5),
-            "2 + 2 == 5",
         ),
         (
             "2       + 2 == 4",
+            "2       + 2 == 5",
             lambda mod: mod.body[0].value.comparators[0],
             ast.Constant(5),
-            "2       + 2 == 5",
         ),
         (
             "2 + 2 == 4 # :)",
+            "2 + 2 == 5 # :)",
             lambda mod: mod.body[0].value.comparators[0],
             ast.Constant(5),
-            "2 + 2 == 5 # :)",
         ),
     ],
 )
-def test_apply_simple(source, target_func, replacement, expected):
+def test_apply_simple(source, expected, target_func, replacement):
     tree = ast.parse(source)
     action = ReplacementAction(target_func(tree), replacement)
     assert action.apply(fake_ctx, source) == expected
 
 
-def test_apply_new_statement():
-    source = textwrap.dedent(
-        """
-    import x # comments
-    print(x.y) # comments here
-    def something(x, y):
-        return x + y # comments"""
-    )
-
-    expected_source = textwrap.dedent(
-        """
-    import x # comments
-    import x
-    print(x.y) # comments here
-    def something(x, y):
-        return x + y # comments"""
-    )
+@pytest.mark.parametrize(
+    "source, expected, target_func",
+    [
+        (
+            """
+                import x # comments
+                print(x.y) # comments here
+                def something(x, y):
+                    return x + y # comments
+            """,
+            """
+                import x # comments
+                import x
+                print(x.y) # comments here
+                def something(x, y):
+                    return x + y # comments
+            """,
+            lambda mod: mod.body[0],
+        )
+    ],
+)
+def test_apply_new_statement(source, expected, target_func):
+    source = textwrap.dedent(source)
+    expected = textwrap.dedent(expected)
 
     tree = ast.parse(source)
-    action = NewStatementAction(tree.body[0])
-    assert action.apply(fake_ctx, source) == expected_source
+    action = NewStatementAction(target_func(tree))
+    assert action.apply(fake_ctx, source) == expected
 
 
 class SimpleAction(Action):
@@ -105,52 +112,53 @@ class PlaceholderReplacer(Rule):
 
 
 @pytest.mark.parametrize(
-    "source, rules, expected_source",
+    "source, expected, rules",
     [
-        ("1+1", PlusToMinusRule, "1 - 1"),
-        ("print(1 + 1)", PlusToMinusRule, "print(1 - 1)"),
+        ("1+1", "1 - 1", PlusToMinusRule),
+        ("print(1 + 1)", "print(1 - 1)", PlusToMinusRule),
         (
             "print(1 + 1, some_other_stuff) and 2 + 2",
-            PlusToMinusRule,
             "print(1 - 1, some_other_stuff) and 2 - 2",
+            PlusToMinusRule,
         ),
         (
             """
-        print(
-            1 +
-            2
-        )""",
-            PlusToMinusRule,
+                print(
+                    1 +
+                    2
+                )
+            """,
             """
-        print(
-            1 - 2
-        )""",
+                print(
+                    1 - 2
+                )
+            """,
+            PlusToMinusRule,
         ),
         (
             "print(x, y, placeholder, z)",
-            PlaceholderReplacer,
             "print(x, y, 42, z)",
+            PlaceholderReplacer,
         ),
     ]
     + [
-        ("1*1", PlusToMinusRule, "1*1"),
+        ("1*1", "1*1", PlusToMinusRule),
         (
             "print(no,change,style)",
-            PlusToMinusRule,
             "print(no,change,style)",
+            PlusToMinusRule,
         ),
     ],
 )
-def test_session_simple(source, rules, expected_source):
+def test_session_simple(source, rules, expected):
     if isinstance(rules, type):
         rules = [rules]
 
-    source, expected_source = textwrap.dedent(source), textwrap.dedent(
-        expected_source
-    )
+    source = textwrap.dedent(source)
+    expected = textwrap.dedent(expected)
 
     session = Session(rules)
-    assert session.run(source) == expected_source
+    assert session.run(source) == expected
 
 
 def test_session_run_file(tmp_path):
