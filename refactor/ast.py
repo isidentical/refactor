@@ -5,7 +5,9 @@ from collections import UserList
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, List, Protocol
+from typing import Any, List, Protocol, Union
+
+from refactor import common
 
 
 @dataclass
@@ -54,7 +56,7 @@ class Unparser(Protocol):
         ...  # pragma: no cover
 
 
-class UnparserBase(ast._Unparser):  # type: ignore
+class BaseUnparser(ast._Unparser):  # type: ignore
     # Normally ast._Unparser is a private API
     # though since it doesn't tend to change
     # often, we could simply have a base class
@@ -75,12 +77,61 @@ class UnparserBase(ast._Unparser):  # type: ignore
         token_stream = tokenize.generate_tokens(buffer.readline)
         return tuple(token_stream)
 
-    @cached_property
-    def token_map(self):
-        return {(*token.start, *token.end): token for token in self.tokens}
-
     @contextmanager
     def indented(self):
         self._indent += 1
         yield
         self._indent -= 1
+
+
+class PreciseUnparser(BaseUnparser):
+    """This a better version of the original unparser, that leverages
+    the existing source code to retrieve sub-code's actual value."""
+
+    def traverse(self, node: Union[List[ast.AST], ast.AST]) -> None:
+        if isinstance(node, list):
+            return super().traverse(node)
+
+        assert isinstance(node, ast.AST)
+
+        try:
+            did_retrieve = self.maybe_retrieve(node)
+        except AssertionError:
+            did_retrieve = False
+
+        if not did_retrieve:
+            super().traverse(node)
+
+    def maybe_retrieve(self, node: ast.AST) -> bool:
+        assert isinstance(node, (ast.stmt, ast.expr))
+
+        try:
+            segment = ast.get_source_segment(self.source, node)
+        except Exception:
+            segment = None
+
+        assert segment
+
+        try:
+            tree = ast.parse(segment)
+        except SyntaxError:
+            return False
+
+        assert len(tree.body) > 0
+        retrieved_node, *_ = tree.body
+
+        # If this is a pure expression, then unpack
+        # the actual value.
+        if isinstance(node, ast.expr):
+            retrieved_node = retrieved_node.value
+
+        assert common.compare_ast(retrieved_node, node)
+
+        self.retrieve_segment(node, segment)
+        return True
+
+    def retrieve_segment(self, node: ast.AST, segment: str) -> None:
+        if isinstance(node, ast.stmt):
+            self.fill()
+
+        self.write(segment)
