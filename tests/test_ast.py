@@ -4,8 +4,7 @@ import tokenize
 
 import pytest
 
-from refactor.ast import UnparserBase, split_lines
-from refactor.common import position_for
+from refactor.ast import BaseUnparser, PreciseUnparser, split_lines
 
 
 def test_split_lines():
@@ -56,15 +55,13 @@ def test_unparser_base():
     tree = ast.parse(source)
     right_node = tree.body[0].value.right
 
-    base = UnparserBase(source)
+    base = BaseUnparser(source)
 
     assert base.unparse(right_node) == "c"
     assert tokenize.untokenize(base.tokens) == source
 
-    assert base.token_map[position_for(right_node)].string == "c"
 
-
-class CustomUnparser(UnparserBase):
+class CustomUnparser(BaseUnparser):
     def visit_List(self, node):
         with self.delimit("[", "]"):
             with self.indented():
@@ -85,8 +82,39 @@ def test_unparser_functions():
     base = CustomUnparser(source)
     assert base.unparse(tree) == textwrap.dedent(
         """\
-    [
-        1,
-        2
-    ]"""
+        [
+            1,
+            2
+        ]"""
     )
+
+
+def test_precise_unparser():
+    source = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print(
+                call(.1),
+                maybe+something_else,
+                maybe
+                /
+                other,
+                thing   . a
+            )
+    """
+    )
+
+    expected_src = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print(call(.1), maybe+something_else, maybe / other, thing   . a, 3)
+    """
+    )
+
+    tree = ast.parse(source)
+    tree.body[0].body[0].body[0].value.args.append(ast.Constant(3))
+
+    base = PreciseUnparser(source)
+    assert base.unparse(tree) + "\n" == expected_src

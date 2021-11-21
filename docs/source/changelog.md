@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.4.0
+
+- Dependency resolution in context providers no longer cause recursions.
+- `token_map` attributes got removed from `refactor.ast.BaseUnparser`.
+- `refactor.ast.UnparserBase` got renamed to `refactor.ast.BaseUnparser`.
+
 ## 0.3.0
 
 - `refactor.NewStatementAction` now auto indents the new statement by looking at previous statement's start prefix.

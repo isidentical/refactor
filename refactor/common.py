@@ -76,6 +76,10 @@ is_contextful = _type_checker(
 )
 
 
+def compare_ast(left: ast.AST, right: ast.AST, /) -> bool:
+    return ast.dump(left) == ast.dump(right)
+
+
 def pascal_to_snake(name: str) -> str:
     """Convert a name written in pascal case notation to
     snake case."""
@@ -90,6 +94,8 @@ def pascal_to_snake(name: str) -> str:
 
 
 def find_indent(source: str) -> Tuple[str, str]:
+    """Split the given line into the current indentation
+    and the remaining characters."""
     index = 0
     for index, char in enumerate(source, 1):
         if not char.isspace():

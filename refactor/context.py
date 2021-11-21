@@ -22,7 +22,7 @@ from typing import (
 )
 
 import refactor.common as common
-from refactor.ast import Unparser, UnparserBase
+from refactor.ast import BaseUnparser, Unparser
 
 
 class Dependable(Protocol):
@@ -57,7 +57,7 @@ class Context:
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
     def unparse(self, node: ast.AST) -> str:
-        base = self.metadata.get("unparse", ast)
+        base = self.metadata.get("unparse", BaseUnparser(self.source))
         assert hasattr(base, "unparse")
         return base.unparse(node)  # type: ignore
 
@@ -282,7 +282,7 @@ class Scope(Representative):
 
 class CustomUnparser(Representative):
 
-    unparser: ClassVar[Type[Unparser]] = UnparserBase
+    unparser: ClassVar[Type[Unparser]] = BaseUnparser
 
     @property
     def name(self):

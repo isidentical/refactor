@@ -28,14 +28,15 @@ $ python examples/switch_places.py t.py
 
 import ast
 from contextlib import suppress
+from functools import token_map
 
 import refactor
 from refactor import common
-from refactor.ast import UnparserBase
+from refactor.ast import BaseUnparser
 from refactor.context import CustomUnparser
 
 
-class LiteralPreservingUnparser(UnparserBase):
+class LiteralPreservingUnparser(BaseUnparser):
     def visit_Constant(self, node: ast.Constant) -> None:
         if token := self.token_map.get(common.position_for(node)):
             with suppress(ValueError):
@@ -44,6 +45,10 @@ class LiteralPreservingUnparser(UnparserBase):
                     return self.write(token.string)
 
         return super().visit_Constant(node)
+
+    @cached_property
+    def token_map(self):
+        return {(*token.start, *token.end): token for token in self.tokens}
 
 
 class PreserveLiterals(CustomUnparser):
