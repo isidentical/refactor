@@ -5,6 +5,7 @@
 - Dependency resolution in context providers no longer cause recursions.
 - `token_map` attributes got removed from `refactor.ast.BaseUnparser`.
 - `refactor.ast.UnparserBase` got renamed to `refactor.ast.BaseUnparser`.
+- Implemented the ability of precisely retrieving the existing child nodes from the source code through `refactor.ast.PreciseUnparser`.
 
 ## 0.3.0
 
