@@ -55,7 +55,7 @@ def test_unparser_base():
     tree = ast.parse(source)
     right_node = tree.body[0].value.right
 
-    base = BaseUnparser(source)
+    base = BaseUnparser(source=source)
 
     assert base.unparse(right_node) == "c"
     assert tokenize.untokenize(base.tokens) == source
@@ -79,7 +79,7 @@ def test_unparser_functions():
     source = "[1, 2]"
     tree = ast.parse(source)
 
-    base = CustomUnparser(source)
+    base = CustomUnparser(source=source)
     assert base.unparse(tree) == textwrap.dedent(
         """\
         [
@@ -116,5 +116,5 @@ def test_precise_unparser():
     tree = ast.parse(source)
     tree.body[0].body[0].body[0].value.args.append(ast.Constant(3))
 
-    base = PreciseUnparser(source)
+    base = PreciseUnparser(source=source)
     assert base.unparse(tree) + "\n" == expected_src

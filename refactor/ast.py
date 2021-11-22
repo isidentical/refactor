@@ -5,7 +5,7 @@ from collections import UserList
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, List, Protocol, Union
+from typing import Any, Generator, List, Optional, Protocol, Tuple, Union
 
 from refactor import common
 
@@ -64,35 +64,38 @@ class BaseUnparser(ast._Unparser):  # type: ignore
     # incompatible changes and let the refactor
     # users to override it.
 
-    def __init__(self, source: str, *args: Any, **kwargs: Any) -> None:
-        self.source = source
+    source: Optional[str]
+
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.source = kwargs.pop("source", None)
         super().__init__(*args, **kwargs)
 
     def unparse(self, node: ast.AST) -> str:
         return self.visit(node)
 
     @cached_property
-    def tokens(self):
+    def tokens(self) -> Tuple[tokenize.TokenInfo, ...]:
         buffer = io.StringIO(self.source)
         token_stream = tokenize.generate_tokens(buffer.readline)
         return tuple(token_stream)
 
     @contextmanager
-    def indented(self):
+    def indented(self) -> Generator[None, None, None]:
         self._indent += 1
         yield
         self._indent -= 1
 
 
 class PreciseUnparser(BaseUnparser):
-    """This a better version of the original unparser, that leverages
-    the existing source code to retrieve sub-code's actual value."""
+    """
+    Try to locate precise textual versions of child nodes by
+    bi-directional AST equivalence with the versions that exist
+    on the source.
+    """
 
     def traverse(self, node: Union[List[ast.AST], ast.AST]) -> None:
-        if isinstance(node, list):
+        if isinstance(node, list) or self.source is None:
             return super().traverse(node)
-
-        assert isinstance(node, ast.AST)
 
         try:
             did_retrieve = self.maybe_retrieve(node)
@@ -103,14 +106,12 @@ class PreciseUnparser(BaseUnparser):
             super().traverse(node)
 
     def maybe_retrieve(self, node: ast.AST) -> bool:
+        assert isinstance(node, ast.AST)
         assert isinstance(node, (ast.stmt, ast.expr))
+        assert self.source is not None
 
-        try:
-            segment = ast.get_source_segment(self.source, node)
-        except Exception:
-            segment = None
-
-        assert segment
+        segment = common.get_source_segment(self.source, node)
+        assert segment is not None
 
         try:
             tree = ast.parse(segment)
