@@ -57,7 +57,7 @@ class Context:
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
     def unparse(self, node: ast.AST) -> str:
-        base = self.metadata.get("unparse", BaseUnparser(self.source))
+        base = self.metadata.get("unparse", BaseUnparser(source=self.source))
         assert hasattr(base, "unparse")
         return base.unparse(node)  # type: ignore
 
