@@ -26,8 +26,7 @@ class ReplaceTypeLiterals(Rule):
         )
 
         match arg:
-            case ast.Constant(value):
-                assert arg.value not in (None, Ellipsis)
+            case ast.Constant(value) if arg.value not in (None, Ellipsis):
                 type_name = type(value).__name__
             case ast.List():
                 type_name = "list"
