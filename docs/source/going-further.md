@@ -26,17 +26,19 @@ For example;
 ```python
 a = 1
 
-def main(d = 5):
+
+def main(d=5):
     b = 4
     c = a + b
     e = 3
     e = 4
     return c + (b * 3) + d + e
 
+
 class T:
     b = 2
     print(a + b + c)
-    
+
     def foo():
         c = 3
         print(a + b + c + d)
@@ -47,17 +49,19 @@ The code above can be transformed to this;
 ```python
 a = 1
 
-def main(d = 5):
+
+def main(d=5):
     b = 4
     c = a + 4
     e = 3
     e = 4
     return c + (4 * 3) + d + e
 
+
 class T:
     b = 2
     print(a + 2 + c)
-    
+
     def foo():
         c = 3
         print(a + b + 3 + d)

@@ -1,6 +1,6 @@
 # API
 
-`refactor` offers a simple progamatic API through `refactor.core.Session`.
+`refactor` offers a simple programmatic API through `refactor.core.Session`.
 
 ## Session
 
