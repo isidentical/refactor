@@ -23,7 +23,7 @@ from refactor.context import (
 class Action:
     """Base class for all actions.
 
-    Override the `build()` method to programatically build
+    Override the `build()` method to programmatically build
     the replacement nodes.
     """
 
