@@ -18,11 +18,22 @@ from typing import (
     Set,
     Tuple,
     Type,
+    Union,
     cast,
 )
 
 import refactor.common as common
-from refactor.ast import BaseUnparser, Unparser
+from refactor.ast import UNPARSER_BACKENDS, BaseUnparser
+
+
+@dataclass
+class Configuration:
+    """Configuration settings for refactor.
+
+    unparser: precise, fast, or a `BaseUnparser` subclass.
+    """
+
+    unparser: Union[str, Type[BaseUnparser]] = "precise"
 
 
 class Dependable(Protocol):
@@ -53,13 +64,33 @@ def resolve_dependencies(
 class Context:
     source: str
     tree: ast.AST
+
     file: Optional[Path] = None
+    config: Configuration = field(default_factory=Configuration)
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
     def unparse(self, node: ast.AST) -> str:
-        base = self.metadata.get("unparse", BaseUnparser(source=self.source))
-        assert hasattr(base, "unparse")
-        return base.unparse(node)  # type: ignore
+        unparser_backend = self.config.unparser
+        if isinstance(unparser_backend, str):
+            if unparser_backend not in UNPARSER_BACKENDS:
+                raise ValueError(
+                    "'unparser_backend' must be one of "
+                    f"these: {', '.join(UNPARSER_BACKENDS)}"
+                )
+            backend_cls = UNPARSER_BACKENDS[unparser_backend]
+        elif isinstance(unparser_backend, type):
+            if not issubclass(unparser_backend, BaseUnparser):
+                raise ValueError(
+                    "'unparser_backend' must inherit from 'BaseUnparser'"
+                )
+            backend_cls = unparser_backend
+        else:
+            raise ValueError(
+                "'unparser_backend' must be either a string or a type"
+            )
+
+        unparser = backend_cls(source=self.source)
+        return unparser.unparse(node)  # type: ignore
 
     def __getitem__(self, key: str) -> Representative:
         if key not in self.metadata:
@@ -278,16 +309,3 @@ class Scope(Representative):
 
         assert scope is not None
         return scope
-
-
-class CustomUnparser(Representative):
-
-    unparser: ClassVar[Type[Unparser]] = BaseUnparser
-
-    @property
-    def name(self):
-        return "unparse"
-
-    def unparse(self, node: ast.AST) -> str:
-        unparser = self.unparser(source=self.context.source)
-        return unparser.unparse(node)
