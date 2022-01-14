@@ -8,10 +8,10 @@ from refactor.change import Change
 from refactor.context import Context, Representative
 from refactor.core import (
     Action,
-    NewStatementAction,
     ReplacementAction,
     Rule,
     Session,
+    TargetedNewStatementAction,
 )
 
 fake_ctx = Context(source="<test>", tree=ast.AST())
@@ -72,7 +72,8 @@ def test_apply_new_statement(source, expected, target_func):
     expected = textwrap.dedent(expected)
 
     tree = ast.parse(source)
-    action = NewStatementAction(target_func(tree))
+    original_node = target_func(tree)
+    action = TargetedNewStatementAction(original_node, original_node)
     assert action.apply(fake_ctx, source) == expected
 
 
@@ -220,9 +221,14 @@ def test_session_invalid_source_generated(tmp_path):
     assert session.run("2 + ??") == "2 + ??"
 
 
+class MirrorAction(Action):
+    def build(self):
+        return self.node
+
+
 class RecursiveRule(Rule):
     def match(self, node):
-        return Action(node)
+        return MirrorAction(node)
 
 
 def test_session_run_deterministic():

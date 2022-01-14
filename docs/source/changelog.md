@@ -8,6 +8,7 @@
 - Renamed `refactor.ast.UnparserBase` to `refactor.ast.BaseUnparser`.
 - Removed `token_map` attribute from `refactor.ast.BaseUnparser`.
 - Removed `refactor.context.CustomUnparser`.
+- Changed `refactor.core.Action`'s `build` method to raise a `NotImplementedError`. Users now have to override it.
 
 ## 0.3.0
 

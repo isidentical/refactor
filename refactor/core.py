@@ -50,7 +50,7 @@ class Action:
 
     def build(self) -> ast.AST:
         """Create the replacement node."""
-        return self.node
+        raise NotImplementedError
 
     def branch(self) -> ast.AST:
         """Return a copy view of the original node."""
@@ -89,6 +89,11 @@ class NewStatementAction(Action):
             lines.insert(end_line, line)
 
         return lines.join()
+
+
+class TargetedNewStatementAction(ReplacementAction, NewStatementAction):
+    """An action for appending the given `target` node
+    right after the `node`."""
 
 
 @dataclass
