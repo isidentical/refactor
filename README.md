@@ -53,7 +53,7 @@ def main():
 -    print(2 +               placeholder      + 3)
 +    print(42 * 3 + 2)
 +    print(2 +               42      + 3)
-     # some commments
+     # some comments
 -    placeholder # maybe other comments
 +    42 # maybe other comments
      if something:
