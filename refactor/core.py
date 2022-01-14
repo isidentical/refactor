@@ -11,11 +11,22 @@ from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type, cast
 from refactor.ast import split_lines
 from refactor.change import Change
 from refactor.common import find_indent, has_positions
-from refactor.context import Context, Representative, resolve_dependencies
+from refactor.context import (
+    Configuration,
+    Context,
+    Representative,
+    resolve_dependencies,
+)
 
 
 @dataclass
 class Action:
+    """Base class for all actions.
+
+    Override the `build()` method to programatically build
+    the replacement nodes.
+    """
+
     node: ast.AST
 
     def apply(self, context: Context, source: str) -> str:
@@ -48,6 +59,9 @@ class Action:
 
 @dataclass
 class ReplacementAction(Action):
+    """An action for replacing the `node` with
+    the given `target` node."""
+
     node: ast.AST
     target: ast.AST
 
@@ -56,8 +70,10 @@ class ReplacementAction(Action):
 
 
 class NewStatementAction(Action):
+    """An action base for adding a new statement right after
+    the given `node`."""
+
     def apply(self, context: Context, source: str) -> str:
-        """Add a new statement just right after the original node."""
         lines = split_lines(source)
 
         start_line = lines[self.node.lineno - 1]
@@ -100,6 +116,7 @@ class Session:
     """A refactoring session."""
 
     rules: List[Type[Rule]] = field(default_factory=list)
+    config: Configuration = field(default_factory=Configuration)
 
     def _initialize_rules(
         self, tree: ast.Module, source: str, file: Optional[Path]
@@ -109,6 +126,7 @@ class Session:
             tree=tree,
             source=source,
             file=file,
+            config=self.config,
         )
         return [
             instance

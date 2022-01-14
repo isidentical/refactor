@@ -3,10 +3,11 @@ import textwrap
 
 import pytest
 
+from refactor.ast import BaseUnparser
 from refactor.context import (
     Ancestry,
+    Configuration,
     Context,
-    CustomUnparser,
     Representative,
     Scope,
     resolve_dependencies,
@@ -14,10 +15,14 @@ from refactor.context import (
 from refactor.core import Rule
 
 
-def get_context(source, *representatives):
+def get_context(source, *representatives, **kwargs):
     tree = ast.parse(textwrap.dedent(source))
+    config = Configuration(**kwargs)
     return Context.from_dependencies(
-        resolve_dependencies(representatives), tree=tree, source=source
+        resolve_dependencies(representatives),
+        config=config,
+        tree=tree,
+        source=source,
     )
 
 
@@ -246,17 +251,17 @@ def test_scope_definitions():
 
 
 def test_custom_unparser():
-    class StaticUnparser(CustomUnparser):
+    class StaticUnparser(BaseUnparser):
         def unparse(self, node):
             return "<chulak>"
 
     regular_context = get_context("hey")
     assert regular_context.unparse(ast.parse("hey")) == "hey"
 
-    default_unparser = get_context("hey", CustomUnparser)
+    default_unparser = get_context("hey", unparser="fast")
     assert default_unparser.unparse(ast.parse("hey")) == "hey"
 
-    context = get_context("hey", StaticUnparser)
+    context = get_context("hey", unparser=StaticUnparser)
     assert context.unparse(ast.parse("hey")) == "<chulak>"
 
 

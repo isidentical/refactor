@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.4.0
+
+- Fixed recursion on dependency resolution.
+- Implemented precise unparsing to leverage from existing structures in the given source.
+- Implemented `refactor.core.Configuration` to configure the unparser.
+- Renamed `refactor.ast.UnparserBase` to `refactor.ast.BaseUnparser`.
+- Removed `token_map` attribute from `refactor.ast.BaseUnparser`.
+- Removed `refactor.context.CustomUnparser`.
+
 ## 0.3.0
 
 - `refactor.NewStatementAction` now auto indents the new statement by looking at previous statement's start prefix.

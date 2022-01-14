@@ -25,8 +25,8 @@ def get_refactors(path: Path) -> Iterable[Type[Rule]]:
             continue
 
         if issubclass(item, Rule):
-            if module := getattr(item, "__module__", None):
-                components = module.split(".")
+            if module_name := getattr(item, "__module__", None):
+                components = module_name.split(".")
                 if components[0] == "refactor":
                     continue
             yield item

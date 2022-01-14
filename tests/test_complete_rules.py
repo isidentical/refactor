@@ -246,6 +246,49 @@ class TypingAutoImporter(refactor.Rule):
         return ModifyExistingImport(closest_import, node.id)
 
 
+class AsyncifierAction(refactor.Action):
+    def build(self):
+        new_node = self.branch()
+        new_node.__class__ = ast.AsyncFunctionDef
+        return new_node
+
+
+class MakeFunctionAsync(refactor.Rule):
+    INPUT_SOURCE = """
+    def something():
+        a += .1
+        '''you know
+            this is custom
+                literal
+        '''
+        print(we,
+            preserve,
+                everything
+        )
+        return (
+            right + "?")
+    """
+
+    EXPECTED_SOURCE = """
+    async def something():
+        a += .1
+        '''you know
+            this is custom
+                literal
+        '''
+        print(we,
+            preserve,
+                everything
+        )
+        return (
+            right + "?")
+    """
+
+    def match(self, node):
+        assert isinstance(node, ast.FunctionDef)
+        return AsyncifierAction(node)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -253,6 +296,7 @@ class TypingAutoImporter(refactor.Rule):
         ReplacePlaceholders,
         PropagateConstants,
         TypingAutoImporter,
+        MakeFunctionAsync,
     ],
 )
 def test_complete_rules(rule):
