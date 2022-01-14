@@ -8,8 +8,7 @@ import pytest
 
 import refactor
 from refactor import ReplacementAction, Session, common, context
-from refactor.ast import PreciseUnparser
-from refactor.context import CustomUnparser, Scope
+from refactor.context import Scope
 
 
 class ReplaceNexts(refactor.Rule):
@@ -254,10 +253,6 @@ class AsyncifierAction(refactor.Action):
         return new_node
 
 
-class PreserveOriginalNodes(CustomUnparser):
-    unparser = PreciseUnparser
-
-
 class MakeFunctionAsync(refactor.Rule):
     INPUT_SOURCE = """
     def something():
@@ -288,8 +283,6 @@ class MakeFunctionAsync(refactor.Rule):
         return (
             right + "?")
     """
-
-    context_providers = (PreserveOriginalNodes,)
 
     def match(self, node):
         assert isinstance(node, ast.FunctionDef)

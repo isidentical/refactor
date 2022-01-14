@@ -97,42 +97,56 @@ class PreciseUnparser(BaseUnparser):
         if isinstance(node, list) or self.source is None:
             return super().traverse(node)
 
-        try:
-            did_retrieve = self.maybe_retrieve(node)
-        except AssertionError:
-            did_retrieve = False
-
+        did_retrieve = self.maybe_retrieve(node)
         if not did_retrieve:
             super().traverse(node)
 
     def maybe_retrieve(self, node: ast.AST) -> bool:
-        assert isinstance(node, ast.AST)
-        assert isinstance(node, (ast.stmt, ast.expr))
-        assert self.source is not None
+        # Process:
+        #   - Check whether the unparser has access to the
+        #     current source code.
+        #   - Check whether the given node is an expression
+        #     or statement.
+        #   - Try retrieving the source segment
+        #   - If that succeeds, try parsing that segment
+        #   - Ensure the ASTs are identical
+        #   - Write-off the original source
+
+        if self.source is None:
+            return False
+
+        if not isinstance(node, (ast.stmt, ast.expr)):
+            return False
 
         segment = common.get_source_segment(self.source, node)
-        assert segment is not None
+        if segment is None:
+            return False
 
         try:
             tree = ast.parse(segment)
         except SyntaxError:
             return False
 
-        assert len(tree.body) > 0
-        retrieved_node, *_ = tree.body
+        if len(tree.body) != 1:
+            return False
+
+        [retrieved_node] = tree.body
 
         # If this is a pure expression, then unpack
         # the actual value.
         if isinstance(node, ast.expr):
             retrieved_node = retrieved_node.value
 
-        assert common.compare_ast(retrieved_node, node)
+        if is_same_ast := common.compare_ast(retrieved_node, node):
+            self.retrieve_segment(node, segment)
 
-        self.retrieve_segment(node, segment)
-        return True
+        return is_same_ast
 
     def retrieve_segment(self, node: ast.AST, segment: str) -> None:
         if isinstance(node, ast.stmt):
             self.fill()
 
         self.write(segment)
+
+
+UNPARSER_BACKENDS = {"fast": BaseUnparser, "precise": PreciseUnparser}

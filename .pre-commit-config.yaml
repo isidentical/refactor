@@ -4,7 +4,7 @@
 default_language_version:
     python: python3.9
 
-exclude: '^examples/'
+exclude: '^examples/type_literals.py'
 
 repos:
 -   repo: local
@@ -15,20 +15,20 @@ repos:
         entry: refactor
         types: [python]
 -   repo: https://github.com/psf/black
-    rev: 21.7b0
+    rev: 21.12b0
     hooks:
     -   id: black
         args: [--experimental-string-processing]
 -   repo: https://github.com/pre-commit/mirrors-isort
-    rev: v5.9.2
+    rev: v5.10.1
     hooks:
     -   id: isort
 -   repo: https://github.com/asottile/setup-cfg-fmt
-    rev: v1.17.0
+    rev: v1.20.0
     hooks:
     -   id: setup-cfg-fmt
 -   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v0.910'
+    rev: 'v0.931'
     hooks:
       -  id: mypy
          args:
@@ -37,14 +37,14 @@ repos:
          -   --disable-error-code
          -   attr-defined
 -   repo: https://github.com/hakancelik96/unimport
-    rev: 0.8.3
+    rev: 0.9.2
     hooks:
       - id: unimport
         args:
         -   --remove
         -   --ignore-init
 -   repo: https://github.com/executablebooks/mdformat/
-    rev: 0.7.5
+    rev: 0.7.13
     hooks:
     -   id: mdformat
         additional_dependencies:
