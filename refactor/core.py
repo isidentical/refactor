@@ -38,7 +38,7 @@ class Action:
         return lines.join()
 
     def build(self) -> ast.AST:
-        """Crate the replacement node."""
+        """Create the replacement node."""
         return self.node
 
     def branch(self) -> ast.AST:
@@ -83,7 +83,7 @@ class Rule:
 
     def check_file(self, path: Optional[Path]) -> bool:
         """Check whether to process this file or not. If returned
-        a false value, the rule will be deactived for this file."""
+        a false value, the rule will be deactivated for this file."""
         return True
 
     def match(self, node: ast.AST) -> Optional[Action]:
