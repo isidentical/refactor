@@ -1,19 +1,7 @@
 """
-Without a custom unparser, the styling will default to what
-ast.unparse is choosing;
+A simple example that leverages the existing tokens to
+regenerate the string back.
 
-Without the LiteralPreservingUnparser:
-```
-$ python examples/switch_places.py t.py
-@@ -1,2 +1,2 @@
-
--print(1e400 + 1e100)
--print('''xxx''' + "x")
-+print(1e+100 - 1e309)
-+print('x' - 'xxx')
-```
-
-But if plug our custom unparser, then it will look like this;
 ```
 $ python examples/switch_places.py t.py
 @@ -1,2 +1,2 @@
@@ -28,14 +16,14 @@ $ python examples/switch_places.py t.py
 
 import ast
 from contextlib import suppress
+from functools import cached_property
 
 import refactor
 from refactor import common
-from refactor.ast import UnparserBase
-from refactor.context import CustomUnparser
+from refactor.ast import BaseUnparser
 
 
-class LiteralPreservingUnparser(UnparserBase):
+class LiteralPreservingUnparser(BaseUnparser):
     def visit_Constant(self, node: ast.Constant) -> None:
         if token := self.token_map.get(common.position_for(node)):
             with suppress(ValueError):
@@ -45,10 +33,9 @@ class LiteralPreservingUnparser(UnparserBase):
 
         return super().visit_Constant(node)
 
-
-class PreserveLiterals(CustomUnparser):
-
-    unparser = LiteralPreservingUnparser
+    @cached_property
+    def token_map(self):
+        return {(*token.start, *token.end): token for token in self.tokens}
 
 
 class SwitchPlacesAction(refactor.Action):
@@ -60,8 +47,6 @@ class SwitchPlacesAction(refactor.Action):
 
 
 class SwitchPlaces(refactor.Rule):
-    context_providers = (PreserveLiterals,)
-
     def match(self, node: ast.AST) -> refactor.Action:
         assert isinstance(node, ast.BinOp)
         assert isinstance(node.op, ast.Add)
@@ -69,4 +54,7 @@ class SwitchPlaces(refactor.Rule):
 
 
 if __name__ == "__main__":
-    refactor.run(rules=[SwitchPlaces])
+    refactor.run(
+        rules=[SwitchPlaces],
+        config=refactor.Configuration(unparser=LiteralPreservingUnparser),
+    )

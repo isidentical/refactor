@@ -2,9 +2,11 @@
 # types like str or dict.
 
 import ast
+
 import refactor
-from refactor import Rule, ReplacementAction
+from refactor import ReplacementAction, Rule
 from refactor.context import Scope
+
 
 class ReplaceTypeLiterals(Rule):
 
@@ -13,29 +15,34 @@ class ReplaceTypeLiterals(Rule):
     def match(self, node):
         assert isinstance(node, ast.Call)
         assert isinstance(func := node.func, ast.Name)
-        assert func.id == 'type'
+        assert func.id == "type"
 
         assert len(node.args) == 1
-        assert type(arg := node.args[0]) in (ast.Constant, ast.List, ast.Tuple, ast.Dict)
+        assert type(arg := node.args[0]) in (
+            ast.Constant,
+            ast.List,
+            ast.Tuple,
+            ast.Dict,
+        )
 
         match arg:
             case ast.Constant(value):
                 assert arg.value not in (None, Ellipsis)
                 type_name = type(value).__name__
             case ast.List():
-                type_name = 'list'
+                type_name = "list"
             case ast.Tuple():
-                type_name = 'tuple'
+                type_name = "tuple"
             case ast.Dict():
-                type_name = 'dict'
+                type_name = "dict"
             case _:
                 return None
 
-        scope = self.context['scope'].resolve(node)
+        scope = self.context["scope"].resolve(node)
 
         for name, reason in [
-            (type_name, 'arg-name-already-defined'),
-            ('type', 'type-function-redefined')
+            (type_name, "arg-name-already-defined"),
+            ("type", "type-function-redefined"),
         ]:
             if name in scope.definitions:
                 definition = scope.definitions[name]
@@ -43,7 +50,7 @@ class ReplaceTypeLiterals(Rule):
                     definition = definition[0]
 
                 line = definition.lineno
-                print(f'skipping: {reason} (on line {line})')
+                print(f"skipping: {reason} (on line {line})")
                 return None
 
         return ReplacementAction(node, ast.Name(type_name, ast.Load()))

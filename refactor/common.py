@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from collections import deque
-from functools import cache, singledispatch
+from functools import cache, singledispatch, wraps
 from typing import (
     Any,
     Callable,
@@ -76,6 +76,51 @@ is_contextful = _type_checker(
 )
 
 
+def compare_ast(left: ast.AST, right: ast.AST, /) -> bool:
+    """Compare 2 AST nodes."""
+    return ast.dump(left) == ast.dump(right)
+
+
+def _guarded(exc_type: Type[BaseException], /, default: Any = None) -> Any:
+    def outer(func):
+        @wraps(func)
+        def inner(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except exc_type:
+                return default_value
+
+        return inner
+
+    return outer
+
+
+@_guarded(Exception)
+def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
+    """Faster (and less-precise) implementation of
+    ast.get_source_segment"""
+
+    try:
+        start_line, start_col, end_line, end_col = position_for(node)
+    except AttributeError:
+        return None
+
+    # Python AST line numbers are 1-indexed
+    start_line -= 1
+    end_line -= 1
+
+    lines = source.splitlines()
+    if len(lines) < end_line + 1:
+        return None
+
+    if start_line == end_line:
+        return lines[start_line][start_col:end_col]
+
+    start, *middle, end = lines[start_line : end_line + 1]
+    new_lines = (start[start_col:], *middle, end[:end_col])
+    return "\n".join(new_lines)
+
+
 def pascal_to_snake(name: str) -> str:
     """Convert a name written in pascal case notation to
     snake case."""
@@ -90,6 +135,8 @@ def pascal_to_snake(name: str) -> str:
 
 
 def find_indent(source: str) -> Tuple[str, str]:
+    """Split the given line into the current indentation
+    and the remaining characters."""
     index = 0
     for index, char in enumerate(source, 1):
         if not char.isspace():

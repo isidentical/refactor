@@ -13,10 +13,9 @@ from typing import (
     Iterable,
     List,
     Optional,
-    Type,
 )
 
-from refactor.core import Rule, Session
+from refactor.core import Session
 
 
 def expand_paths(path: Path) -> Iterable[Path]:
@@ -95,7 +94,7 @@ def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
     )
 
 
-def run(rules: List[Type[Rule]]) -> int:
-    session = Session(rules)
+def run(*args, **kwargs) -> int:  # type: ignore
+    session = Session(*args, **kwargs)
     main = partial(unbound_main, session=session)
     return main()
