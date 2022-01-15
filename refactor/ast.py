@@ -122,19 +122,25 @@ class PreciseUnparser(BaseUnparser):
         if segment is None:
             return False
 
+        if isinstance(node, ast.expr):
+            source_revision = common.wrap_with_parens(segment)
+        else:
+            source_revision = segment
+
         try:
-            tree = ast.parse(segment)
+            tree = ast.parse(source_revision)
         except SyntaxError:
             return False
 
         if len(tree.body) != 1:
             return False
 
+        retrieved_node: ast.AST
         [retrieved_node] = tree.body
 
         # If this is a pure expression, then unpack
         # the actual value.
-        if isinstance(node, ast.expr):
+        if isinstance(node, ast.expr) and isinstance(retrieved_node, ast.Expr):
             retrieved_node = retrieved_node.value
 
         if is_same_ast := common.compare_ast(retrieved_node, node):
