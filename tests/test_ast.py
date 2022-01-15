@@ -97,9 +97,7 @@ def test_precise_unparser():
             print(
                 call(.1),
                 maybe+something_else,
-                maybe
-                /
-                other,
+                maybe / other,
                 thing   . a
             )
     """
@@ -110,6 +108,34 @@ def test_precise_unparser():
     def func():
         if something:
             print(call(.1), maybe+something_else, maybe / other, thing   . a, 3)
+    """
+    )
+
+    tree = ast.parse(source)
+    tree.body[0].body[0].body[0].value.args.append(ast.Constant(3))
+
+    base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_unparser_indented_literals():
+    source = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print(
+                "bleh"
+                "zoom"
+            )
+    """
+    )
+
+    expected_src = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print("bleh"
+                "zoom", 3)
     """
     )
 
