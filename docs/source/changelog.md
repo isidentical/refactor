@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.4.1
+
+- Preserve indented literal expressions (e.g the first argument of the following call):
+
+```
+call(
+    "something"
+    "foo"
+    "bar,
+    3
+)
+```
+
 ## 0.4.0
 
 - Fixed recursion on dependency resolution.

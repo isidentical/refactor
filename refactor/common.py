@@ -30,6 +30,11 @@ def apply_condition(condition: bool, node: ast.expr) -> ast.expr:
         return negate(node)
 
 
+def wrap_with_parens(text: str) -> str:
+    """Wrap the given `text` with parens."""
+    return "(" + text + ")"
+
+
 _OPERATOR_MAP = {
     ast.Eq: True,
     ast.In: True,
