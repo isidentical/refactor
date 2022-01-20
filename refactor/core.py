@@ -8,7 +8,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type, cast
 
-from refactor.ast import split_lines
+from refactor.ast import precise_parse, split_lines
 from refactor.change import Change
 from refactor.common import find_indent, has_positions
 from refactor.context import (
@@ -148,7 +148,7 @@ class Session:
         _known_sources: FrozenSet[str] = frozenset(),
     ) -> Tuple[str, bool]:
         try:
-            tree = ast.parse(source)
+            tree = precise_parse(source)
         except SyntaxError as exc:
             if _changed is False:
                 return source, _changed
