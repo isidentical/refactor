@@ -1,13 +1,13 @@
 import importlib
 import importlib.util
 from argparse import ArgumentParser
+from itertools import chain
 from pathlib import Path
 from typing import Iterable, Type
 
 from refactor.core import Rule, Session
-from refactor.runner import run_files
-
-_POSSIBLE_FILES = [Path("refactors.py"), Path(".refactors/__init__.py")]
+from refactor.runner import expand_paths, run_files
+from refactor.validate_inputs import validate_main_inputs
 
 
 def get_refactors(path: Path) -> Iterable[Type[Rule]]:
@@ -41,25 +41,13 @@ def main() -> int:
     )
 
     options = parser.parse_args()
-    if options.refactor_file:
-        refactor_file = options.refactor_dir
-        if refactor_file.exists():
-            raise ValueError(
-                f"Given --refactor-file '{refactor_file!s}' doesn't exist"
-            )
-    else:
-        for refactor_file in _POSSIBLE_FILES:
-            if refactor_file.exists():
-                break
-        else:
-            raise ValueError(
-                "Either provide a file using --refactor-file or ensure one of "
-                "these directories exist: "
-                + ", ".join(map(str, _POSSIBLE_FILES))
-            )
+    validate_main_inputs(options)
 
-    session = Session(list(get_refactors(refactor_file)))
-    return run_files(session, options.src, apply=options.dont_apply, workers=1)
+    session = Session(list(get_refactors(options.refactor_file)))
+    files = chain.from_iterable(
+        expand_paths(source_dest) for source_dest in options.src
+    )
+    return run_files(session, files, apply=options.dont_apply, workers=1)
 
 
 if __name__ == "__main__":
