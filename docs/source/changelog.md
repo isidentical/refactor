@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.2
+
+- Fix handling of `--refactor-file`. Reported and contributed by [gerrymanoim](https://github.com/gerrymanoim).
+
 ## 0.4.1
 
 - Preserve indented literal expressions (e.g the first argument of the following call):
