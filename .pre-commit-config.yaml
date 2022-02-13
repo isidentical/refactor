@@ -18,7 +18,6 @@ repos:
     rev: 21.12b0
     hooks:
     -   id: black
-        args: [--experimental-string-processing]
 -   repo: https://github.com/pre-commit/mirrors-isort
     rev: v5.10.1
     hooks:
