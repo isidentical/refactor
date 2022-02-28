@@ -93,7 +93,7 @@ def _guarded(exc_type: Type[BaseException], /, default: Any = None) -> Any:
             try:
                 return func(*args, **kwargs)
             except exc_type:
-                return default_value
+                return default
 
         return inner
 
