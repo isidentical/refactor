@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.4.3
+
+- Fix internal guards from failing due to a name error. Reported and contributed by [Nikita Sobolev](https://github.com/sobolevn).
+
 ## 0.4.2
 
 - Fix handling of `--refactor-file`. Reported and contributed by [gerrymanoim](https://github.com/gerrymanoim).
@@ -37,8 +41,3 @@ call(
 - `refactor.context.ScopeInfo` objects now can list definitions made in their context.
 - `refactor.context.Context` objects now store the path for the module they are processing if it is available.
 - Refactors now preserve the starting indentation for multiline statements.
-
-# (0.4.0) Adding a new argument to the whole call
-
--print(call(.1), maybe+something_else.prop)
-+print(call(.1), maybe+something_else.prop, 'Hello')
