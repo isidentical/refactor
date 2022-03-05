@@ -1,6 +1,9 @@
 # See https://pre-commit.com for more information
 # See https://pre-commit.com/hooks.html for more hooks
 
+ci:
+    autofix_prs: false
+
 default_language_version:
     python: python3.9
 
