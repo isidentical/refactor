@@ -1,6 +1,7 @@
 import ast
 import textwrap
 import typing
+from contextlib import suppress
 from dataclasses import dataclass
 from typing import List
 
@@ -289,6 +290,43 @@ class MakeFunctionAsync(refactor.Rule):
         return AsyncifierAction(node)
 
 
+class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
+    context_providers = (context.Scope,)
+
+    INPUT_SOURCE = """
+        class Klass:
+            def method(self, *, a):
+                print()
+                
+            lambda self, *, a: print
+
+        """
+
+    EXPECTED_SOURCE = """
+        class Klass:
+            def method(self, *, a):
+                print()
+                
+            lambda self, *, a: print
+
+        """
+
+    def match(self, node: ast.AST):  # type: ignore
+        assert isinstance(node, ast.FunctionDef)
+
+        for stmt in node.body:
+            for identifier in ast.walk(stmt):
+                if not (isinstance(identifier, ast.Name) and isinstance(identifier.ctx, ast.Load)):
+                    continue
+
+                scope = self.context["scope"].resolve(identifier)
+                while not (definitions := scope.definitions.get(identifier.id, [])):
+                    scope = scope.parent
+                    if scope is None:
+                        break
+        return True
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -305,3 +343,21 @@ def test_complete_rules(rule):
     assert session.run(textwrap.dedent(rule.INPUT_SOURCE)) == textwrap.dedent(
         rule.EXPECTED_SOURCE
     )
+
+
+@pytest.mark.parametrize(
+    "rule",
+    [
+        OnlyKeywordArgumentDefaultNotSetCheckRule,
+    ]
+)
+def test_check_rules(rule):
+    source = textwrap.dedent(rule.INPUT_SOURCE)
+    tree = ast.parse(source)
+
+    session = Session([rule])
+    rule = session._initialize_rules(tree, source, None).pop()
+
+    for node in ast.walk(tree):
+        with suppress(AssertionError):
+            assert rule.match(node) is True

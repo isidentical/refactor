@@ -50,7 +50,6 @@ def test_split_lines_variations(source):
 
 
 def test_unparser_base():
-
     source = "a +      b + c # comment"
     tree = ast.parse(source)
     right_node = tree.body[0].value.right
