@@ -1,13 +1,14 @@
 import ast
 import textwrap
 import typing
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import List
 
 import pytest
 
 import refactor
-from refactor import ReplacementAction, Session, common, context
+from refactor import Action, ReplacementAction, Session, common, context
 from refactor.context import Scope
 
 
@@ -289,6 +290,60 @@ class MakeFunctionAsync(refactor.Rule):
         return AsyncifierAction(node)
 
 
+class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
+    context_providers = (context.Scope,)
+
+    INPUT_SOURCE = """
+        class Klass:
+            def method(self, *, a):
+                print()
+                
+            lambda self, *, a: print
+
+        """
+
+    EXPECTED_SOURCE = """
+        class Klass:
+            def method(self, *, a=None):
+                print()
+                
+            lambda self, *, a=None: print
+
+        """
+
+    def match(self, node: ast.AST) -> typing.Optional[Action]:
+        assert isinstance(node, (ast.FunctionDef, ast.Lambda))
+        assert any(kw_default is None for kw_default in node.args.kw_defaults)
+
+        if isinstance(node, ast.Lambda) and not (isinstance(node.body, ast.Name) and isinstance(node.body.ctx, ast.Load)):
+            scope = self.context["scope"].resolve(node.body)
+            scope.definitions.get(node.body.id, [])
+
+        elif isinstance(node, ast.FunctionDef):
+            for stmt in node.body:
+                for identifier in ast.walk(stmt):
+                    if not (isinstance(identifier, ast.Name) and isinstance(identifier.ctx, ast.Load)):
+                        continue
+
+                    scope = self.context["scope"].resolve(identifier)
+                    while not scope.definitions.get(identifier.id, []):
+                        scope = scope.parent
+                        if scope is None:
+                            break
+
+        kw_defaults = []
+        for kw_default in node.args.kw_defaults:
+            if kw_default is None:
+                kw_defaults.append(ast.Constant(value=None))
+            else:
+                kw_defaults.append(kw_default)
+
+        target = deepcopy(node)
+        target.args.kw_defaults = kw_defaults
+
+        return ReplacementAction(node, target)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -297,6 +352,7 @@ class MakeFunctionAsync(refactor.Rule):
         PropagateConstants,
         TypingAutoImporter,
         MakeFunctionAsync,
+        OnlyKeywordArgumentDefaultNotSetCheckRule
     ],
 )
 def test_complete_rules(rule):
