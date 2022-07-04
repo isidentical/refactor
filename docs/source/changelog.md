@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- Fixed when using keyword-only argument and default argument is not set. Reported by [Felix Uellendall](https://github.com/feluelle) and contributed by [Hakan Çelik](https://github.com/hakancelikdev)
+- Fixed crash of scope processing code due to keyword-only argument marker. Reported by [Felix Uellendall](https://github.com/feluelle) and contributed by [Hakan Çelik](https://github.com/hakancelikdev)
 
 ## 0.4.3
 
