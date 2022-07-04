@@ -202,7 +202,6 @@ def unpack_lhs(node: ast.AST) -> Iterator[str]:
 def walk_scope(node: ast.AST) -> Iterator[ast.AST]:
     """Like regular ast.walk() but only walks within the
     current scope."""
-
     todo = deque(_walker(node))
     while todo:
         node = todo.popleft()
@@ -234,7 +233,7 @@ def _walk_func(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
     if top_level:
         yield from node.decorator_list
         yield from node.args.defaults
-        yield from node.args.kw_defaults
+        yield from _walk_optional_list(node.args.kw_defaults)
         yield from _walk_optional(node.returns)
     else:
         yield from _walk_args(node.args)
@@ -245,7 +244,7 @@ def _walk_func(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
 def _walk_lambda(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
     if top_level:
         yield from node.args.defaults
-        yield from node.args.kw_defaults
+        yield from _walk_optional_list(node.args.kw_defaults)
     else:
         yield from _walk_args(node.args)
         yield node.body
@@ -268,6 +267,11 @@ def _walk_args(node: ast.arguments) -> List[ast.arg]:
     if node.kwarg:
         args.append(node.kwarg)
     return args
+
+
+def _walk_optional_list(nodes: List[Optional[ast.AST]]) -> Iterator[ast.AST]:
+    for node in nodes:
+        yield from _walk_optional(node)
 
 
 def _walk_optional(node: Optional[ast.AST]) -> Iterator[ast.AST]:

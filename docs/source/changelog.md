@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Fixed crash of scope processing code due to keyword-only argument marker. Reported by [Felix Uellendall](https://github.com/feluelle) and contributed by [Hakan Çelik](https://github.com/hakancelikdev)
+
 ## 0.4.3
 
 - Fix internal guards from failing due to a name error. Reported and contributed by [Nikita Sobolev](https://github.com/sobolevn).
