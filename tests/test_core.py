@@ -100,7 +100,6 @@ class SimpleRepresentative(Representative):
 
 
 class PlaceholderReplacer(Rule):
-
     context_providers = (SimpleRepresentative,)
 
     def match(self, node):
