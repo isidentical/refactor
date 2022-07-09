@@ -53,7 +53,6 @@ class ModifyExistingImport(refactor.Action):
 
 
 class TypingAutoImporter(refactor.Rule):
-
     context_providers = (ImportFinder, context.Scope)
 
     def find_last_import(self, tree: ast.AST) -> ast.stmt:
