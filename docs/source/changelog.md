@@ -2,7 +2,7 @@
 
 ## Unreleased
 
-- `common.find_closest` now takes `end_lineno` and `end_col_offset` into account.
+- `common.find_closest` now takes `end_lineno` and `end_col_offset` into account. It also ensures there is at least one target node.
 
 ## 0.4.4
 
