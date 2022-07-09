@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import io
 import tokenize
@@ -5,9 +7,32 @@ from collections import UserList
 from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Generator, List, Optional, Protocol, Tuple, Union
+from typing import (
+    Any,
+    Generator,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    Union,
+)
 
 from refactor import common
+
+
+def precise_parse(source: str) -> ast.Module:
+    tree = ast.parse(source)
+    nodes = [node for node in ast.walk(tree) if isinstance(node, ast.stmt)]
+    # TO-DO: non-standalone comments should probably handle
+    # the indentation better.
+    comments = _get_comments(source)
+
+    for comment in comments:
+        closest = common.find_closest(comment, *nodes)
+        closest.__dict__.setdefault("comments", []).append(comment)
+
+    return tree
 
 
 @dataclass
@@ -97,9 +122,23 @@ class PreciseUnparser(BaseUnparser):
         if isinstance(node, list) or self.source is None:
             return super().traverse(node)
 
+        if isinstance(node, ast.stmt):
+            before, sticked, after = _group_comments(node)
+            for comment in before:
+                self.fill()
+                self.write(comment.value)
+
         did_retrieve = self.maybe_retrieve(node)
         if not did_retrieve:
             super().traverse(node)
+
+        if isinstance(node, ast.stmt):
+            if sticked:
+                self.write(sticked.value)
+
+            for comment in after:
+                self.fill()
+                self.write(comment.value)
 
     def maybe_retrieve(self, node: ast.AST) -> bool:
         # Process:
@@ -156,3 +195,68 @@ class PreciseUnparser(BaseUnparser):
 
 
 UNPARSER_BACKENDS = {"fast": BaseUnparser, "precise": PreciseUnparser}
+
+# Since AST does not preserve individual comments, it is really
+# tricky to allow full-statement refactors without losing a bit
+# of information. To get around this, we introduce the ast.Comment
+# which is like a regular statement and gets unparsed into a single
+# line comment.
+
+
+def _patch_ast(cls):
+    setattr(ast, cls.__name__, cls)
+    return cls
+
+
+@_patch_ast
+class whitespace(ast.AST):
+    """whitespace = Comment(string value)"""
+
+    _attributes = (
+        "lineno",
+        "col_offset",
+        "end_lineno",
+        "end_col_offset",
+    )
+
+
+@_patch_ast
+class Comment(whitespace):
+    """Comment(string value, bool is_standalone)"""
+
+    _fields = ("value", "is_standalone")
+
+
+def _get_comments(source: str) -> Iterator[Comment]:
+    buffer = io.StringIO(source)
+
+    for token_info in tokenize.generate_tokens(buffer.readline):
+        if token_info.type != tokenize.COMMENT:
+            continue
+
+        is_standalone = token_info.string.strip() == token_info.line.strip()
+        yield Comment(
+            token_info.string,
+            is_standalone,
+            lineno=token_info.start[0],
+            col_offset=token_info.start[1],
+            end_lineno=token_info.end[0],
+            end_col_offset=token_info.end[1],
+        )
+
+
+def _group_comments(
+    node: ast.stmt,
+) -> Tuple[List[Comment], Optional[Comment], List[Comment]]:
+    before, sticked, after = [], None, []
+
+    comments = getattr(node, "comments", [])
+    for comment in comments:
+        if comment.lineno < node.lineno:
+            before.append(comment)
+        elif comment.lineno == node.lineno:
+            sticked = comment
+        else:
+            after.append(comment)
+
+    return before, sticked, after
