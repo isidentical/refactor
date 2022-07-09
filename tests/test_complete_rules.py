@@ -183,7 +183,6 @@ class ModifyExistingImport(refactor.Action):
 
 
 class TypingAutoImporter(refactor.Rule):
-
     INPUT_SOURCE = """
     import lol
     from something import another
@@ -315,14 +314,20 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         assert isinstance(node, (ast.FunctionDef, ast.Lambda))
         assert any(kw_default is None for kw_default in node.args.kw_defaults)
 
-        if isinstance(node, ast.Lambda) and not (isinstance(node.body, ast.Name) and isinstance(node.body.ctx, ast.Load)):
+        if isinstance(node, ast.Lambda) and not (
+            isinstance(node.body, ast.Name)
+            and isinstance(node.body.ctx, ast.Load)
+        ):
             scope = self.context["scope"].resolve(node.body)
             scope.definitions.get(node.body.id, [])
 
         elif isinstance(node, ast.FunctionDef):
             for stmt in node.body:
                 for identifier in ast.walk(stmt):
-                    if not (isinstance(identifier, ast.Name) and isinstance(identifier.ctx, ast.Load)):
+                    if not (
+                        isinstance(identifier, ast.Name)
+                        and isinstance(identifier.ctx, ast.Load)
+                    ):
                         continue
 
                     scope = self.context["scope"].resolve(identifier)
@@ -352,7 +357,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         PropagateConstants,
         TypingAutoImporter,
         MakeFunctionAsync,
-        OnlyKeywordArgumentDefaultNotSetCheckRule
+        OnlyKeywordArgumentDefaultNotSetCheckRule,
     ],
 )
 def test_complete_rules(rule):

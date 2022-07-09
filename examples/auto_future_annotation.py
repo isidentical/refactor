@@ -36,10 +36,7 @@ class RefactorFutureAnnotationUsedRule(Rule):
 
         assert self.context["check_future_annotations_import"].check()
 
-        future_annotation_mapping = {
-            "List": "list",
-            "Dict": "dict"
-        }
+        future_annotation_mapping = {"List": "list", "Dict": "dict"}
         new_annotation_id = future_annotation_mapping[node.id]
 
         target = ast.Name(id=new_annotation_id, ctx=node.ctx)
