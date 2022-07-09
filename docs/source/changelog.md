@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `common.find_closest` now takes `end_lineno` and `end_col_offset` into account.
+
 ## 0.4.4
 
 - Fixed crash of scope processing code due to keyword-only argument marker. Reported by [Felix Uellendall](https://github.com/feluelle) and contributed by [Hakan Çelik](https://github.com/hakancelikdev)
