@@ -278,7 +278,6 @@ class ScopeInfo(common.Singleton):
 
 
 class Scope(Representative):
-
     context_providers = (Ancestry,)
 
     def resolve(self, node: ast.AST) -> ScopeInfo:
