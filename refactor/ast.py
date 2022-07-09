@@ -12,7 +12,6 @@ from refactor import common
 
 @dataclass
 class Lines(UserList):
-
     lines: List[str]
     trailing_newline: bool = False
 

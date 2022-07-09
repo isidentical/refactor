@@ -38,7 +38,7 @@ class Action:
         indentation, start_prefix = find_indent(
             target_lines[0][: self.node.col_offset]
         )
-        end_prefix = target_lines[-1][self.node.end_col_offset:]
+        end_prefix = target_lines[-1][self.node.end_col_offset :]
 
         replacement = split_lines(context.unparse(self.build()))
         replacement.apply_indentation(
