@@ -56,7 +56,6 @@ def is_truthy(op: ast.cmpop) -> Optional[bool]:
 def _type_checker(
     *types: Type, binders: Iterable[Callable[[Type], bool]] = ()
 ) -> Callable[[Any], bool]:
-
     binders = [getattr(binder, "fast_checker", binder) for binder in binders]
 
     @cache
@@ -156,10 +155,15 @@ def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     if not len(targets) >= 0:
         raise ValueError("condition failed: len(targets) >= 0")
 
-    def closest(target):
-        return (
-            abs(target.lineno - node.lineno),
-            abs(target.col_offset - node.col_offset),
+    node_positions = position_for(node)
+
+    def closest(target: ast.AST) -> Tuple[int, ...]:
+        target_positions = position_for(target)
+        return tuple(
+            abs(target_position - node_position)
+            for target_position, node_position in zip(
+                target_positions, node_positions
+            )
         )
 
     sorted_targets = sorted(targets, key=closest)
