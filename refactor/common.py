@@ -152,8 +152,8 @@ def find_indent(source: str) -> Tuple[str, str]:
 def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     """Find the closest node against given sequence
     of targets (absolute distance from starting points)."""
-    if not len(targets) >= 0:
-        raise ValueError("condition failed: len(targets) >= 0")
+    if not len(targets) >= 1:
+        raise ValueError("condition failed: len(targets) >= 1")
 
     node_positions = position_for(node)
 
