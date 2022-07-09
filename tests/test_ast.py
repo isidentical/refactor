@@ -74,7 +74,6 @@ class CustomUnparser(BaseUnparser):
 
 
 def test_unparser_functions():
-
     source = "[1, 2]"
     tree = ast.parse(source)
 

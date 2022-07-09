@@ -5,7 +5,6 @@ from refactor.context import Scope
 
 
 class PropagateConstants(refactor.Rule):
-
     context_providers = (Scope,)
 
     def match(self, node):
