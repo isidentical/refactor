@@ -1,8 +1,7 @@
-import os
 from argparse import Namespace
 from contextlib import contextmanager
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import NamedTemporaryFile
 from typing import Generator
 
 import pytest
@@ -33,15 +32,14 @@ def test_valid_inputs():
         assert options.refactor_file == tmp_file
 
 
-@pytest.mark.parametrize(
-    "invalid_options",
-    [
-        Namespace(refactor_file=None),
-        Namespace(refactor_file=Path("/some/bad/file/somewhere.py")),
-    ],
-)
-def test_invalid_inputs(invalid_options):
+def test_invalid_inputs_refactor_file_none():
+    import os
+
     with pytest.raises(ValueError):
-        with TemporaryDirectory() as tmp_dir:
-            os.chdir(tmp_dir)
-            validate_main_inputs(invalid_options)
+        os.chdir("/")
+        validate_main_inputs(Namespace(refactor_file=None))
+
+
+def test_invalid_inputs():
+    with pytest.raises(ValueError):
+        validate_main_inputs(Namespace(refactor_file=Path("/some/bad/file/somewhere.py")))
