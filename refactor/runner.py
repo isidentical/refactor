@@ -1,3 +1,4 @@
+import os
 from argparse import ArgumentParser
 from collections import defaultdict
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -16,6 +17,8 @@ from typing import (
 )
 
 from refactor.core import Session
+
+_DEFAULT_WORKERS = object()
 
 
 def expand_paths(path: Path) -> Iterable[Path]:
@@ -43,12 +46,28 @@ def dump_stats(stats: Dict[str, int]) -> str:
     return ", ".join(messages)
 
 
+def _determine_workers(workers: Any, debug_mode: bool = False) -> int:
+    if isinstance(workers, int):
+        return workers
+    elif workers is _DEFAULT_WORKERS:
+        cpu_count = os.cpu_count()
+        if debug_mode or not cpu_count:
+            return 1
+        else:
+            return cpu_count
+    else:
+        raise ValueError(f"Invalid number of workers: {workers!r}")
+
+
 def run_files(
     session: Session,
     files: Iterable[Path],
     apply: bool = False,
-    workers: int = 1,
+    workers: Any = _DEFAULT_WORKERS,
+    debug_mode: bool = False,
 ) -> int:
+    workers = _determine_workers(workers, debug_mode)
+
     executor: ContextManager[Any]
     if workers == 1:
         executor = nullcontext()
@@ -83,14 +102,21 @@ def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
     parser = ArgumentParser()
     parser.add_argument("src", nargs="+", type=Path)
     parser.add_argument("-a", "--apply", action="store_true", default=False)
-    parser.add_argument("-w", "--workers", type=int, default=4)
+    parser.add_argument("-w", "--workers", type=int, default=_DEFAULT_WORKERS)
+    parser.add_argument(
+        "-d", "--enable-debug-mode", action="store_true", default=False
+    )
 
     options = parser.parse_args()
     files = chain.from_iterable(
         expand_paths(source_dest) for source_dest in options.src
     )
     return run_files(
-        session, files, apply=options.apply, workers=options.workers
+        session,
+        files,
+        apply=options.apply,
+        workers=options.workers,
+        debug_mode=options.enable_debug_mode,
     )
 
 

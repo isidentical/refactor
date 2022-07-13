@@ -150,10 +150,7 @@ class Session:
         try:
             tree = ast.parse(source)
         except SyntaxError as exc:
-            if _changed is False:
-                return source, _changed
-            else:
-                raise ValueError("Generated source is unparsable") from exc
+            return self._delegate_syntax_errors(source, _changed, exc)
 
         _known_sources |= {source}
         rules = self._initialize_rules(tree, source, file)
@@ -174,6 +171,14 @@ class Session:
                             )
 
         return source, _changed
+
+    def _delegate_syntax_errors(
+        self, source: str, changed: bool, exc: SyntaxError
+    ) -> Tuple[str, bool]:
+        if not changed:
+            return source, changed
+
+        raise ValueError("Generated source is unparsable") from exc
 
     def run(self, source: str, *, file: Optional[Path] = None) -> str:
         """Refactor the given string with the rules bound to

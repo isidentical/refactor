@@ -31,9 +31,11 @@ class Configuration:
     """Configuration settings for refactor.
 
     unparser: precise, fast, or a `BaseUnparser` subclass.
+    debug_mode: whether to output more debug information.
     """
 
     unparser: Union[str, Type[BaseUnparser]] = "precise"
+    debug_mode: bool = False
 
 
 class Dependable(Protocol):
