@@ -64,9 +64,8 @@ def run_files(
     files: Iterable[Path],
     apply: bool = False,
     workers: Any = _DEFAULT_WORKERS,
-    debug_mode: bool = False,
 ) -> int:
-    workers = _determine_workers(workers, debug_mode)
+    workers = _determine_workers(workers, session.config.debug_mode)
 
     executor: ContextManager[Any]
     if workers == 1:
@@ -108,6 +107,7 @@ def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
     )
 
     options = parser.parse_args()
+    session.config.debug_mode = options.enable_debug_mode
     files = chain.from_iterable(
         expand_paths(source_dest) for source_dest in options.src
     )
@@ -116,7 +116,6 @@ def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
         files,
         apply=options.apply,
         workers=options.workers,
-        debug_mode=options.enable_debug_mode,
     )
 
 
