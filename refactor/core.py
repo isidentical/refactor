@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import tempfile
 import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -178,7 +179,15 @@ class Session:
         if not changed:
             return source, changed
 
-        raise ValueError("Generated source is unparsable") from exc
+        error_message = "Generated source is unparsable."
+
+        if self.config.debug_mode:
+            fd, file_name = tempfile.mkstemp(prefix="refactor", text=True)
+            with open(fd, "w") as stream:
+                stream.write(source)
+            error_message += f"\nSee {file_name} for the generated source."
+
+        raise ValueError(error_message) from exc
 
     def run(self, source: str, *, file: Optional[Path] = None) -> str:
         """Refactor the given string with the rules bound to
