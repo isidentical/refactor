@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import copy
+import tempfile
 import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
@@ -150,10 +151,7 @@ class Session:
         try:
             tree = ast.parse(source)
         except SyntaxError as exc:
-            if _changed is False:
-                return source, _changed
-            else:
-                raise ValueError("Generated source is unparsable") from exc
+            return self._delegate_syntax_errors(source, _changed, exc)
 
         _known_sources |= {source}
         rules = self._initialize_rules(tree, source, file)
@@ -174,6 +172,22 @@ class Session:
                             )
 
         return source, _changed
+
+    def _delegate_syntax_errors(
+        self, source: str, changed: bool, exc: SyntaxError
+    ) -> Tuple[str, bool]:
+        if not changed:
+            return source, changed
+
+        error_message = "Generated source is unparsable."
+
+        if self.config.debug_mode:
+            fd, file_name = tempfile.mkstemp(prefix="refactor", text=True)
+            with open(fd, "w") as stream:
+                stream.write(source)
+            error_message += f"\nSee {file_name} for the generated source."
+
+        raise ValueError(error_message) from exc
 
     def run(self, source: str, *, file: Optional[Path] = None) -> str:
         """Refactor the given string with the rules bound to

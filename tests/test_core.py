@@ -1,11 +1,12 @@
 import ast
 import copy
+import re
 import textwrap
 
 import pytest
 
 from refactor.change import Change
-from refactor.context import Context, Representative
+from refactor.context import Configuration, Context, Representative
 from refactor.core import (
     Action,
     ReplacementAction,
@@ -198,28 +199,6 @@ def test_session_run_file(tmp_path):
     assert paths == {file_1, file_2}
 
 
-class InvalidAction(Action):
-    def apply(self, context, source):
-        return "??"
-
-
-class InvalidRule(Rule):
-    def match(self, node):
-        assert isinstance(node, ast.BinOp)
-        assert isinstance(node.op, ast.Add)
-
-        return InvalidAction(node)
-
-
-def test_session_invalid_source_generated(tmp_path):
-    session = Session([InvalidRule])
-
-    with pytest.raises(ValueError):
-        assert session.run("2 + 2")
-
-    assert session.run("2 + ??") == "2 + ??"
-
-
 class MirrorAction(Action):
     def build(self):
         return self.node
@@ -236,6 +215,43 @@ def test_session_run_deterministic():
     refactored_source, changed = session._run("2 + 2 + 3 + 4")
     assert not changed
     assert refactored_source == "2 + 2 + 3 + 4"
+
+
+class InvalidRule(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.Name)
+        return ReplacementAction(node, ast.Name("!id"))
+
+
+def test_session_run_invalid_code():
+    session = Session([InvalidRule])
+    assert session.run("!id = 1") == "!id = 1"
+
+
+def test_session_run_invalid_generated_code():
+    session = Session([InvalidRule])
+    with pytest.raises(ValueError, match=r"Generated source is unparsable\.$"):
+        session.run("z = 1")
+
+
+INVALID_GENERATED_SOURCE_CODE = re.compile(
+    r"Generated source is unparsable\.\n"
+    r"See (?P<file_name>.*) for the generated source."
+)
+
+
+def test_session_run_invalid_generated_code_debug_mode():
+    session = Session([InvalidRule], config=Configuration(debug_mode=True))
+    with pytest.raises(
+        ValueError,
+        match=INVALID_GENERATED_SOURCE_CODE,
+    ) as exc_info:
+        session.run("z = 1")
+
+    match = INVALID_GENERATED_SOURCE_CODE.match(str(exc_info.value))
+    assert match is not None
+    with open(match["file_name"]) as handle:
+        assert handle.read() == "!id = 1"
 
 
 class ChangeSign(Rule):
