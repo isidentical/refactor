@@ -3,6 +3,9 @@
 ## Unreleased
 
 - `common.find_closest` now takes `end_lineno` and `end_col_offset` into account. It also ensures there is at least one target node.
+- Added `debug_mode` setting to `refactor.context.Configuration`
+- Added a command-line flag (`-d`/`--enable-debug-mode`) to the default CLI runner to change session's configuration.
+- When some unparsable source code is generated, the contents can be now seen if the debug mode is enabled.
 
 ## 0.4.4
 
