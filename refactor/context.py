@@ -25,6 +25,18 @@ from typing import (
 import refactor.common as common
 from refactor.ast import UNPARSER_BACKENDS, BaseUnparser
 
+__all__ = [
+    "Ancestry",
+    "Configuration",
+    "Context",
+    "Dependable",
+    "Representative",
+    "Scope",
+    "ScopeInfo",
+    "ScopeType",
+    "resolve_dependencies",
+]
+
 
 @dataclass
 class Configuration:

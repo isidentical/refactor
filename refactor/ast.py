@@ -9,6 +9,15 @@ from typing import Any, Generator, List, Optional, Protocol, Tuple, Union
 
 from refactor import common
 
+__all__ = [
+    "BaseUnparser",
+    "Lines",
+    "PreciseUnparser",
+    "UNPARSER_BACKENDS",
+    "Unparser",
+    "split_lines",
+]
+
 
 @dataclass
 class Lines(UserList):
