@@ -32,14 +32,14 @@ def test_valid_inputs():
         assert options.refactor_file == tmp_file
 
 
-def test_invalid_inputs_refactor_file_none():
-    import os
-
+@pytest.mark.parametrize(
+    "invalid_options",
+    [
+        Namespace(refactor_file=None),
+        Namespace(refactor_file=Path("/some/bad/file/somewhere.py")),
+    ],
+)
+def test_invalid_inputs(invalid_options, tmpdir, monkeypatch):
     with pytest.raises(ValueError):
-        os.chdir("/")
-        validate_main_inputs(Namespace(refactor_file=None))
-
-
-def test_invalid_inputs():
-    with pytest.raises(ValueError):
-        validate_main_inputs(Namespace(refactor_file=Path("/some/bad/file/somewhere.py")))
+        monkeypatch.chdir(tmpdir)
+        validate_main_inputs(invalid_options)
