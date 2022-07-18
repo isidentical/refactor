@@ -2,6 +2,7 @@
 
 ## Unreleased
 
+- Add experimental Windows support contributed by [Hakan Celik](https://github.com/hakancelikdev)
 - `common.find_closest` now takes `end_lineno` and `end_col_offset` into account. It also ensures there is at least one target node.
 - Added `debug_mode` setting to `refactor.context.Configuration`
 - Added a command-line flag (`-d`/`--enable-debug-mode`) to the default CLI runner to change session's configuration.
@@ -9,7 +10,7 @@
 
 ## 0.4.4
 
-- Fixed crash of scope processing code due to keyword-only argument marker. Reported by [Felix Uellendall](https://github.com/feluelle) and contributed by [Hakan Çelik](https://github.com/hakancelikdev)
+- Fixed crash of scope processing code due to keyword-only argument marker. Reported by [Felix Uellendall](https://github.com/feluelle) and contributed by [Hakan Celik](https://github.com/hakancelikdev)
 
 ## 0.4.3
 

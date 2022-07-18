@@ -1,8 +1,7 @@
-import os
 from argparse import Namespace
 from contextlib import contextmanager
 from pathlib import Path
-from tempfile import NamedTemporaryFile, TemporaryDirectory
+from tempfile import NamedTemporaryFile
 from typing import Generator
 
 import pytest
@@ -40,8 +39,7 @@ def test_valid_inputs():
         Namespace(refactor_file=Path("/some/bad/file/somewhere.py")),
     ],
 )
-def test_invalid_inputs(invalid_options):
+def test_invalid_inputs(invalid_options, tmpdir, monkeypatch):
     with pytest.raises(ValueError):
-        with TemporaryDirectory() as tmp_dir:
-            os.chdir(tmp_dir)
-            validate_main_inputs(invalid_options)
+        monkeypatch.chdir(tmpdir)
+        validate_main_inputs(invalid_options)
