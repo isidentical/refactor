@@ -5,6 +5,8 @@ from pathlib import Path
 
 from refactor.ast import split_lines
 
+__all__ = ["Change"]
+
 
 @dataclass
 class Change:

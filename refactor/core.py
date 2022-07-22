@@ -19,6 +19,15 @@ from refactor.context import (
     resolve_dependencies,
 )
 
+__all__ = [
+    "Action",
+    "NewStatementAction",
+    "ReplacementAction",
+    "Rule",
+    "Session",
+    "TargetedNewStatementAction",
+]
+
 
 @dataclass
 class Action:

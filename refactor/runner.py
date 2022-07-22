@@ -18,6 +18,8 @@ from typing import (
 
 from refactor.core import Session
 
+__all__ = ["dump_stats", "expand_paths", "run", "run_files", "unbound_main"]
+
 _DEFAULT_WORKERS = object()
 
 
