@@ -2,10 +2,20 @@ import ast
 import io
 import tokenize
 from collections import UserList
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Generator, List, Optional, Protocol, Tuple, Union
+from typing import (
+    Any,
+    ContextManager,
+    Generator,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Tuple,
+    Union,
+)
 
 from refactor import common
 
@@ -147,11 +157,40 @@ class PreciseUnparser(BaseUnparser):
 
         return is_same_ast
 
+    @contextmanager
+    def _collect_comments(self, node: ast.AST) -> Iterator[None]:
+        # If there are any preceding comments (until the start of
+        # the previous AST node), we'll collect them and stick it
+        # to the start of the retrieved source segment.
+        lines = self.source.splitlines()
+        for line in reversed(lines[:node.lineno - 1]):
+            comment_begin = line.find("#")
+            if comment_begin == -1 or comment_begin != node.col_offset:
+                break
+
+            self.fill()
+            self.write(line[comment_begin:])
+        yield
+        for line in lines[node.end_lineno:]:
+            comment_begin = line.find("#")
+            if comment_begin == -1 or comment_begin != node.col_offset:
+                break
+
+            self.fill()
+            self.write(line[comment_begin:])
+
+    def collect_comments(self, node: ast.AST) -> ContextManager[None]:
+        if isinstance(node, ast.stmt):
+            return self._collect_comments(node)
+        else:
+            return nullcontext()
+
     def retrieve_segment(self, node: ast.AST, segment: str) -> None:
         if isinstance(node, ast.stmt):
             self.fill()
 
-        self.write(segment)
+        with self.collect_comments(node):
+            self.write(segment)
 
 
 UNPARSER_BACKENDS = {"fast": BaseUnparser, "precise": PreciseUnparser}
