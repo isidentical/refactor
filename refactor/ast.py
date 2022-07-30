@@ -215,7 +215,7 @@ class PreciseUnparser(BaseUnparser):
 
     def collect_comments(self, node: ast.AST) -> ContextManager[None]:
         if isinstance(node, ast.stmt):
-            return self._collect_comments(node)
+            return self._collect_stmt_comments(node)
         else:
             return nullcontext()
 
