@@ -2,10 +2,22 @@ import ast
 import io
 import tokenize
 from collections import UserList
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, Generator, List, Optional, Protocol, Tuple, Union
+from typing import (
+    Any,
+    ContextManager,
+    Generator,
+    Iterator,
+    List,
+    Optional,
+    Protocol,
+    Set,
+    Tuple,
+    Union,
+    cast,
+)
 
 from refactor import common
 
@@ -92,6 +104,10 @@ class PreciseUnparser(BaseUnparser):
     on the source.
     """
 
+    def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self._visited_comment_lines: Set[int] = set()
+        super().__init__(*args, **kwargs)
+
     def traverse(self, node: Union[List[ast.AST], ast.AST]) -> None:
         if isinstance(node, list) or self.source is None:
             return super().traverse(node)
@@ -147,11 +163,65 @@ class PreciseUnparser(BaseUnparser):
 
         return is_same_ast
 
-    def retrieve_segment(self, node: ast.AST, segment: str) -> None:
-        if isinstance(node, ast.stmt):
-            self.fill()
+    @contextmanager
+    def _collect_stmt_comments(self, node: ast.AST) -> Iterator[None]:
+        def _write_if_unseen_comment(
+            line_no: int,
+            line: str,
+            comment_begin: int,
+        ) -> None:
+            if line_no in self._visited_comment_lines:
+                # We have already written this comment as the
+                # end of another node. No need to re-write it.
+                return
 
-        self.write(segment)
+            self.fill()
+            self.write(line[comment_begin:])
+            self._visited_comment_lines.add(line_no)
+
+        assert self.source is not None
+        lines = self.source.splitlines()
+        node_start, node_end = node.lineno - 1, cast(int, node.end_lineno)
+
+        # Collect comments in the reverse order, so we can properly
+        # identify the end of the current comment block.
+        preceding_comments = []
+        for offset, line in enumerate(reversed(lines[:node_start])):
+            comment_begin = line.find("#")
+            if comment_begin == -1 or comment_begin != node.col_offset:
+                break
+
+            preceding_comments.append(
+                (node_start - offset, line, comment_begin)
+            )
+
+        for comment_info in reversed(preceding_comments):
+            _write_if_unseen_comment(*comment_info)
+
+        yield
+
+        for offset, line in enumerate(lines[node_end:], 1):
+            comment_begin = line.find("#")
+            if comment_begin == -1 or comment_begin != node.col_offset:
+                break
+
+            _write_if_unseen_comment(
+                line_no=node_end + offset,
+                line=line,
+                comment_begin=comment_begin,
+            )
+
+    def collect_comments(self, node: ast.AST) -> ContextManager[None]:
+        if isinstance(node, ast.stmt):
+            return self._collect_stmt_comments(node)
+        else:
+            return nullcontext()
+
+    def retrieve_segment(self, node: ast.AST, segment: str) -> None:
+        with self.collect_comments(node):
+            if isinstance(node, ast.stmt):
+                self.fill()
+            self.write(segment)
 
 
 UNPARSER_BACKENDS = {"fast": BaseUnparser, "precise": PreciseUnparser}
