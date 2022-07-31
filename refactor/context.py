@@ -74,6 +74,21 @@ class Context:
     config: Configuration = field(default_factory=Configuration)
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
+    @classmethod
+    def from_dependencies(
+        cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
+    ) -> Context:
+        context = cls(**kwargs)
+        context.import_dependencies(dependencies)
+        return context
+
+    def import_dependencies(
+        self, representatives: Iterable[Type[Representative]]
+    ) -> None:
+        for raw_representative in representatives:
+            representative = raw_representative(self)
+            self.metadata[representative.name] = representative
+
     def unparse(self, node: ast.AST) -> str:
         unparser_backend = self.config.unparser
         if isinstance(unparser_backend, str):
@@ -112,20 +127,11 @@ class Context:
             )
         return self.metadata[key]
 
-    def import_dependencies(
-        self, representatives: Iterable[Type[Representative]]
-    ) -> None:
-        for raw_representative in representatives:
-            representative = raw_representative(self)
-            self.metadata[representative.name] = representative
-
-    @classmethod
-    def from_dependencies(
-        cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
-    ) -> Context:
-        context = cls(**kwargs)
-        context.import_dependencies(dependencies)
-        return context
+    def __getattr__(self, attr: str) -> Representative:
+        try:
+            return self[attr]
+        except ValueError:
+            raise AttributeError(f"{self!r} has no attribute {attr!r}")
 
 
 @dataclass
