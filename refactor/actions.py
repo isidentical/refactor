@@ -33,6 +33,18 @@ class BaseAction:
         raise NotImplementedError
 
 
+class _DeprecatedAliasMixin:
+    def __post_init__(self, *args, **kwargs):
+        warnings.warn(
+            f"{type(self).__name__!r} is deprecated, use"
+            f" {type(self).__base__.__name__!r} instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        with suppress(AttributeError):
+            super().__post_init__(*args, **kwargs)
+
+
 @dataclass
 class _LazyActionMixin(Generic[K, T], BaseAction):
     node: K
@@ -73,16 +85,8 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
 
 
 @dataclass
-class Action(LazyReplace):
-    def __post_init__(self, *args, **kwargs):
-        warnings.warn(
-            f"{type(self).__name__!r} is deprecated, use"
-            f" {type(self).__base__.__name__!r} instead",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        with suppress(AttributeError):
-            super().__post_init__(*args, **kwargs)
+class Action(LazyReplace, _DeprecatedAliasMixin):
+    ...
 
 
 @_hint("deprecated_alias", "ReplacementAction")
@@ -99,16 +103,8 @@ class Replace(LazyReplace):
 
 
 @dataclass
-class ReplacementAction(Replace):
-    def __post_init__(self, *args, **kwargs):
-        warnings.warn(
-            f"{type(self).__name__!r} is deprecated, use"
-            f" {type(self).__base__.__name__!r} instead",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        with suppress(AttributeError):
-            super().__post_init__(*args, **kwargs)
+class ReplacementAction(Replace, _DeprecatedAliasMixin):
+    ...
 
 
 @_hint("deprecated_alias", "NewStatementAction")
@@ -136,16 +132,8 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
 
 
 @dataclass
-class NewStatementAction(LazyInsertAfter):
-    def __post_init__(self, *args, **kwargs):
-        warnings.warn(
-            f"{type(self).__name__!r} is deprecated, use"
-            f" {type(self).__base__.__name__!r} instead",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        with suppress(AttributeError):
-            super().__post_init__(*args, **kwargs)
+class NewStatementAction(LazyInsertAfter, _DeprecatedAliasMixin):
+    ...
 
 
 @_hint("deprecated_alias", "TargetedNewStatementAction")
@@ -161,13 +149,5 @@ class InsertAfter(LazyInsertAfter):
 
 
 @dataclass
-class TargetedNewStatementAction(InsertAfter):
-    def __post_init__(self, *args, **kwargs):
-        warnings.warn(
-            f"{type(self).__name__!r} is deprecated, use"
-            f" {type(self).__base__.__name__!r} instead",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        with suppress(AttributeError):
-            super().__post_init__(*args, **kwargs)
+class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
+    ...

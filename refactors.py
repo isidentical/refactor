@@ -3,7 +3,7 @@ from pathlib import Path
 from typing import Optional
 
 import refactor
-from refactor import InsertAfter, Replace, common
+from refactor import InsertAfter, Replace
 from refactor.context import Scope
 
 
@@ -43,20 +43,6 @@ def _is_hinted_with(node: ast.AST, name: str) -> bool:
     )
 
 
-_DEPRECATION_POST_INIT = common.extract_from_text(
-    """\
-def __post_init__(self, *args, **kwargs):
-    warnings.warn(
-        f"{type(self).__name__!r} is deprecated, use {type(self).__base__.__name__!r} instead",
-        DeprecationWarning,
-        stacklevel=3,
-    )
-    with suppress(AttributeError):
-        super().__post_init__(*args, **kwargs)
-"""
-)
-
-
 class RefactorDeprecatedAliases(refactor.Rule):
     FILES = frozenset(["refactor/actions.py"])
     context_providers = (Scope,)
@@ -78,10 +64,10 @@ class RefactorDeprecatedAliases(refactor.Rule):
 
         replacement = ast.ClassDef(
             name=alias_name,
-            bases=[ast.Name(node.name)],
+            bases=[ast.Name(node.name), ast.Name("_DeprecatedAliasMixin")],
             keywords=[],
-            body=[_DEPRECATION_POST_INIT],
-            decorator_list=node.decorator_list[1:],
+            body=[ast.Expr(ast.Constant(...))],
+            decorator_list=[ast.Name("dataclass")],
         )
         return InsertAfter(node, replacement)
 
