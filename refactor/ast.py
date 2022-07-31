@@ -165,10 +165,6 @@ class PreciseUnparser(BaseUnparser):
 
     @contextmanager
     def _collect_stmt_comments(self, node: ast.AST) -> Iterator[None]:
-        # If there are any preceding comments (until the start of
-        # the previous AST node), we'll collect them and stick it
-        # to the start of the retrieved source segment.
-
         def _write_if_unseen_comment(
             line_no: int,
             line: str,
