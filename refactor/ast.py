@@ -187,20 +187,23 @@ class PreciseUnparser(BaseUnparser):
         lines = self.source.splitlines()
         node_start, node_end = node.lineno - 1, cast(int, node.end_lineno)
 
-        # We'll start from the end of the current node's start
-        # and work backwards.
+        # Collect comments in the reverse order, so we can properly
+        # identify the end of the current comment block.
+        preceding_comments = []
         for offset, line in enumerate(reversed(lines[:node_start])):
             comment_begin = line.find("#")
             if comment_begin == -1 or comment_begin != node.col_offset:
                 break
 
-            _write_if_unseen_comment(
-                line_no=node_start - offset,
-                line=line,
-                comment_begin=comment_begin,
+            preceding_comments.append(
+                (node_start - offset, line, comment_begin)
             )
-            continue
+
+        for comment_info in reversed(preceding_comments):
+            _write_if_unseen_comment(*comment_info)
+
         yield
+
         for offset, line in enumerate(lines[node_end:], 1):
             comment_begin = line.find("#")
             if comment_begin == -1 or comment_begin != node.col_offset:
@@ -211,7 +214,6 @@ class PreciseUnparser(BaseUnparser):
                 line=line,
                 comment_begin=comment_begin,
             )
-            continue
 
     def collect_comments(self, node: ast.AST) -> ContextManager[None]:
         if isinstance(node, ast.stmt):

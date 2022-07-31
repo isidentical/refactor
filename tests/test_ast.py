@@ -142,3 +142,53 @@ def test_precise_unparser_indented_literals():
 
     base = PreciseUnparser(source=source)
     assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_unparser_comments():
+    source = textwrap.dedent(
+        """\
+    def foo():
+    # unindented comment
+        # indented but not connected comment
+
+        # a
+        # a1
+        print()
+        # a2
+        print()
+        # b
+
+        # b2
+        print(
+            c # e
+        )
+        # c
+        print(d)
+        # final comment
+    """
+    )
+
+    expected_src = textwrap.dedent(
+        """\
+    def foo():
+        # a
+        # a1
+        print()
+        # a2
+        print()
+        # b
+        # b2
+        print(
+            c # e
+        )
+        # c
+    """
+    )
+
+    tree = ast.parse(source)
+
+    # # Remove the print(d)
+    tree.body[0].body.pop()
+
+    base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
