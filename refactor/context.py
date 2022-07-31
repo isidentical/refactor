@@ -41,6 +41,9 @@ class Configuration:
 class Dependable(Protocol):
     context_providers: ClassVar[Tuple[Type[Representative], ...]]
 
+    def __init__(self, context: Context) -> None:
+        ...
+
 
 def resolve_dependencies(
     dependables: Iterable[Type[Dependable]],
@@ -95,6 +98,12 @@ class Context:
         return unparser.unparse(node)  # type: ignore
 
     def __getitem__(self, key: str) -> Representative:
+        # For built-in representatives, we can automatically import them.
+        if key in _BUILTIN_REPRESENTATIVES:
+            self.import_dependencies(
+                resolve_dependencies([_BUILTIN_REPRESENTATIVES[key]])
+            )
+
         if key not in self.metadata:
             raise ValueError(
                 f"{key!r} provider is not available on this context "
@@ -103,18 +112,19 @@ class Context:
             )
         return self.metadata[key]
 
+    def import_dependencies(
+        self, representatives: Iterable[Type[Representative]]
+    ) -> None:
+        for raw_representative in representatives:
+            representative = raw_representative(self)
+            self.metadata[representative.name] = representative
+
     @classmethod
     def from_dependencies(
         cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
     ) -> Context:
         context = cls(**kwargs)
-        representatives = [dependency(context) for dependency in dependencies]
-        context.metadata.update(
-            {
-                representative.name: representative
-                for representative in representatives
-            }
-        )
+        context.import_dependencies(dependencies)
         return context
 
 
@@ -310,3 +320,9 @@ class Scope(Representative):
 
         assert scope is not None
         return scope
+
+
+_BUILTIN_REPRESENTATIVES = {
+    "ancestry": Ancestry,
+    "scope": Scope,
+}
