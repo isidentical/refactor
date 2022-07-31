@@ -8,8 +8,14 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type
 
-from refactor.actions import *
-from refactor.actions import Action
+# TODO: remove the deprecated aliases on 1.0.0
+from refactor.actions import (  # unimport:skip
+    Action,
+    BaseAction,
+    NewStatementAction,
+    ReplacementAction,
+    TargetedNewStatementAction,
+)
 from refactor.change import Change
 from refactor.common import has_positions
 from refactor.context import (
@@ -31,7 +37,7 @@ class Rule:
         a false value, the rule will be deactivated for this file."""
         return True
 
-    def match(self, node: ast.AST) -> Optional[Action]:
+    def match(self, node: ast.AST) -> Optional[BaseAction]:
         """Match the node against the current refactoring rule.
 
         On success, it will return an `Action` instance. On fail
@@ -91,6 +97,7 @@ class Session:
                             return self._run(
                                 new_source,
                                 _changed=True,
+                                file=file,
                                 _known_sources=_known_sources,
                             )
 

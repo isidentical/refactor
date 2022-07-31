@@ -1,4 +1,11 @@
+# TODO: remove the deprecated aliases on 1.0.0
 from refactor.actions import *
+from refactor.actions import (
+    Action,
+    NewStatementAction,
+    ReplacementAction,
+    TargetedNewStatementAction,
+)
 from refactor.context import Configuration, Context, Representative
 from refactor.core import Rule, Session
 from refactor.runner import run

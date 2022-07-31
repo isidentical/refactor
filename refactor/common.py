@@ -13,8 +13,11 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    TypeVar,
     cast,
 )
+
+C = TypeVar("C")
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
@@ -170,6 +173,12 @@ def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     return sorted_targets[0]
 
 
+def extract_from_text(text: str) -> ast.AST:
+    """Extract the first AST node from the given text's
+    parsed AST."""
+    return ast.parse(text).body[0]
+
+
 _POSITIONAL_ATTRIBUTES = (
     "lineno",
     "col_offset",
@@ -291,3 +300,12 @@ class Singleton:
         if not cls._instances.get(args):
             cls._instances[args] = super().__new__(cls)
         return cls._instances[args]
+
+
+def _hint(handler: str, *args: Any, **kwargs: Any) -> Callable[[C], C]:
+    """Internal hint function for global refactors."""
+
+    def wrapper(obj: C) -> C:
+        return obj
+
+    return wrapper

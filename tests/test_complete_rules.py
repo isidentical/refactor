@@ -8,7 +8,7 @@ from typing import List
 import pytest
 
 import refactor
-from refactor import Action, ReplacementAction, Session, common, context
+from refactor import BaseAction, ReplacementAction, Session, common, context
 from refactor.context import Scope
 
 
@@ -296,7 +296,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         class Klass:
             def method(self, *, a):
                 print()
-                
+
             lambda self, *, a: print
 
         """
@@ -305,12 +305,12 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         class Klass:
             def method(self, *, a=None):
                 print()
-                
+
             lambda self, *, a=None: print
 
         """
 
-    def match(self, node: ast.AST) -> typing.Optional[Action]:
+    def match(self, node: ast.AST) -> typing.Optional[BaseAction]:
         assert isinstance(node, (ast.FunctionDef, ast.Lambda))
         assert any(kw_default is None for kw_default in node.args.kw_defaults)
 

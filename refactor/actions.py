@@ -2,33 +2,58 @@ from __future__ import annotations
 
 import ast
 import copy
+import warnings
+from contextlib import suppress
 from dataclasses import dataclass
-from typing import cast
+from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
-from refactor.common import find_indent
+from refactor.common import _hint, find_indent
 from refactor.context import Context
 
+K = TypeVar("K")
+T = TypeVar("T")
+C = TypeVar("C")
+
 __all__ = [
-    "Action",
-    "ReplacementAction",
-    "NewStatementAction",
-    "TargetedNewStatementAction",
+    "BaseAction",
+    "InsertAfter",
+    "LazyInsertAfter",
+    "LazyReplace",
+    "Replace",
 ]
 
 
-@dataclass
-class Action:
-    """Base class for all actions.
-
-    Override the `build()` method to programmatically build
-    the replacement nodes.
-    """
-
-    node: ast.AST
+class BaseAction:
+    """A source code editing action."""
 
     def apply(self, context: Context, source: str) -> str:
-        """Refactor a source segment in the given string."""
+        """Takes the source code for the module we are processing,
+        as well as the current context and returns a modified version of it."""
+        raise NotImplementedError
+
+
+@dataclass
+class _LazyActionMixin(Generic[K, T], BaseAction):
+    node: K
+
+    def build(self) -> T:
+        """Create the replacement node."""
+        raise NotImplementedError
+
+    def branch(self) -> K:
+        """Return a full copy of the original node."""
+        return copy.deepcopy(self.node)
+
+
+@_hint("deprecated_alias", "Action")
+@dataclass
+class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
+    """Replaces the code segment of the given
+    node with the re-synthesized version of the
+    built target (via build())."""
+
+    def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
         view = slice(self.node.lineno - 1, self.node.end_lineno)
 
@@ -46,30 +71,51 @@ class Action:
         lines[view] = replacement
         return lines.join()
 
-    def build(self) -> ast.AST:
-        """Create the replacement node."""
-        raise NotImplementedError
-
-    def branch(self) -> ast.AST:
-        """Return a copy view of the original node."""
-        return copy.deepcopy(self.node)
-
 
 @dataclass
-class ReplacementAction(Action):
-    """An action for replacing the `node` with
-    the given `target` node."""
+class Action(LazyReplace):
+    def __post_init__(self, *args, **kwargs):
+        warnings.warn(
+            f"{type(self).__name__!r} is deprecated, use"
+            f" {type(self).__base__.__name__!r} instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        with suppress(AttributeError):
+            super().__post_init__(*args, **kwargs)
 
-    node: ast.AST
+
+@_hint("deprecated_alias", "ReplacementAction")
+@dataclass
+class Replace(LazyReplace):
+    """Replaces the code segment of the given
+    node with the re-synthesized version of the
+    given target."""
+
     target: ast.AST
 
     def build(self) -> ast.AST:
         return self.target
 
 
-class NewStatementAction(Action):
-    """An action base for adding a new statement right after
-    the given `node`."""
+@dataclass
+class ReplacementAction(Replace):
+    def __post_init__(self, *args, **kwargs):
+        warnings.warn(
+            f"{type(self).__name__!r} is deprecated, use"
+            f" {type(self).__base__.__name__!r} instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        with suppress(AttributeError):
+            super().__post_init__(*args, **kwargs)
+
+
+@_hint("deprecated_alias", "NewStatementAction")
+@dataclass
+class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
+    """Inserts the built target right
+    after the given node."""
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
@@ -89,6 +135,39 @@ class NewStatementAction(Action):
         return lines.join()
 
 
-class TargetedNewStatementAction(ReplacementAction, NewStatementAction):
-    """An action for appending the given `target` node
-    right after the `node`."""
+@dataclass
+class NewStatementAction(LazyInsertAfter):
+    def __post_init__(self, *args, **kwargs):
+        warnings.warn(
+            f"{type(self).__name__!r} is deprecated, use"
+            f" {type(self).__base__.__name__!r} instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        with suppress(AttributeError):
+            super().__post_init__(*args, **kwargs)
+
+
+@_hint("deprecated_alias", "TargetedNewStatementAction")
+@dataclass
+class InsertAfter(LazyInsertAfter):
+    """Inserts the given target right
+    after the given node."""
+
+    target: ast.stmt
+
+    def build(self) -> ast.stmt:
+        return self.target
+
+
+@dataclass
+class TargetedNewStatementAction(InsertAfter):
+    def __post_init__(self, *args, **kwargs):
+        warnings.warn(
+            f"{type(self).__name__!r} is deprecated, use"
+            f" {type(self).__base__.__name__!r} instead",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        with suppress(AttributeError):
+            super().__post_init__(*args, **kwargs)

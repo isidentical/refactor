@@ -1,7 +1,6 @@
 import ast
 from typing import Optional
 
-import refactor
 from refactor import ReplacementAction, Representative, Rule, run
 from refactor.context import Ancestry
 
@@ -24,7 +23,7 @@ class CheckFutureAnnotationsImport(Representative):
 class RefactorFutureAnnotationUsedRule(Rule):
     context_providers = (CheckFutureAnnotationsImport, Ancestry)
 
-    def match(self, node: ast.AST) -> Optional[refactor.Action]:
+    def match(self, node: ast.AST) -> Optional[ReplacementAction]:
         assert isinstance(node, ast.Name)
         assert node.id in ("List", "Dict")
 

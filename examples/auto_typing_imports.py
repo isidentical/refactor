@@ -34,7 +34,7 @@ class AddNewImport(refactor.NewStatementAction):
     module: str
     names: List[str]
 
-    def build(self) -> ast.AST:
+    def build(self) -> ast.stmt:
         return ast.ImportFrom(
             level=0,
             module=self.module,
@@ -69,7 +69,7 @@ class TypingAutoImporter(refactor.Rule):
 
         return tree.body[index]
 
-    def match(self, node: ast.AST) -> refactor.Action:
+    def match(self, node: ast.AST) -> refactor.BaseAction:
         assert isinstance(node, ast.Name)
         assert isinstance(node.ctx, ast.Load)
         assert node.id in typing.__all__
