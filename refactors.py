@@ -43,7 +43,7 @@ def _is_hinted_with(node: ast.AST, name: str) -> bool:
     )
 
 
-class RefactorDeprecatedAliases(refactor.Rule):
+class ProcessDeprecationHints(refactor.Rule):
     FILES = frozenset(["refactor/actions.py"])
     context_providers = (Scope,)
 
@@ -73,4 +73,4 @@ class RefactorDeprecatedAliases(refactor.Rule):
 
 
 if __name__ == "__main__":
-    refactor.run([RefactorAsserts, RefactorDeprecatedAliases])
+    refactor.run([RefactorAsserts, ProcessDeprecationHints])
