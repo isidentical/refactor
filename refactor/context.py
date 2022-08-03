@@ -12,6 +12,7 @@ from typing import (
     DefaultDict,
     Dict,
     Iterable,
+    Iterator,
     List,
     Optional,
     Protocol,
@@ -211,19 +212,31 @@ class ScopeInfo(common.Singleton):
     scope_type: ScopeType
     parent: Optional[ScopeInfo] = field(default=None, repr=False)
 
-    def can_reach(self, other: ScopeInfo) -> bool:
-        if other.scope_type is ScopeType.GLOBAL:
-            return True
-        elif self is other:
-            return True
+    def _iter_reachable_scopes(self) -> Iterator[ScopeInfo]:
+        yield self
 
-        cursor = self
+        cursor: ScopeInfo = self
+        # TODO: implement a more fine grained scope resolution with support
+        # for nested comprehensions.
         while cursor := cursor.parent:  # type: ignore
-            if cursor is other:
-                if other.scope_type is ScopeType.FUNCTION:
-                    return True
+            if cursor.scope_type in (ScopeType.FUNCTION, ScopeType.GLOBAL):
+                yield cursor
+
+    def can_reach(self, other: ScopeInfo) -> bool:
+        """Return whether this scope can access the
+        definitions from 'other' scope."""
+        for reachable_scope in self._iter_reachable_scopes():
+            if reachable_scope is other:
+                return True
         else:
             return False
+
+    def get_definitions(self, name: str) -> Optional[List[ast.AST]]:
+        for reachable_scope in self._iter_reachable_scopes():
+            if reachable_scope.defines(name):
+                return reachable_scope.definitions[name]
+        else:
+            return None
 
     def defines(self, name: str) -> bool:
         return name in self.definitions

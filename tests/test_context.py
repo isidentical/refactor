@@ -70,7 +70,7 @@ def test_scope():
                 d = 2
                 self_read(d)
                 return a, b, c, d
-    
+
     out_read(b)
     out_read(c)
     out_read(d)
@@ -78,7 +78,7 @@ def test_scope():
         out_read(b)
         out_read(c)
         out_read(d)
-    
+
         def something():
             out_read(b)
             out_read(c)
