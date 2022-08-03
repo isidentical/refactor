@@ -1,7 +1,8 @@
 import ast
 from typing import Optional
 
-from refactor import ReplacementAction, Representative, Rule, run
+from refactor import Representative, Rule, run
+from refactor.actions import Replace
 from refactor.context import Ancestry
 
 
@@ -23,7 +24,7 @@ class CheckFutureAnnotationsImport(Representative):
 class RefactorFutureAnnotationUsedRule(Rule):
     context_providers = (CheckFutureAnnotationsImport, Ancestry)
 
-    def match(self, node: ast.AST) -> Optional[ReplacementAction]:
+    def match(self, node: ast.AST) -> Optional[Replace]:
         assert isinstance(node, ast.Name)
         assert node.id in ("List", "Dict")
 
@@ -39,7 +40,7 @@ class RefactorFutureAnnotationUsedRule(Rule):
         new_annotation_id = future_annotation_mapping[node.id]
 
         target = ast.Name(id=new_annotation_id, ctx=node.ctx)
-        return ReplacementAction(node, target)
+        return Replace(node, target)
 
 
 if __name__ == "__main__":

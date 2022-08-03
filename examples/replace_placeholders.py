@@ -3,7 +3,8 @@
 import ast
 
 import refactor
-from refactor import ReplacementAction, Rule
+from refactor import Rule
+from refactor.actions import Replace
 
 
 class ReplacePlaceholders(Rule):
@@ -13,7 +14,7 @@ class ReplacePlaceholders(Rule):
         assert node.id == "placeholder"
 
         replacement = ast.Constant(42)
-        return ReplacementAction(node, replacement)
+        return Replace(node, replacement)
 
 
 if __name__ == "__main__":

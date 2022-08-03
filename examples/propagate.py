@@ -20,7 +20,7 @@ class PropagateConstants(refactor.Rule):
         assert isinstance(definition := definitions[0], ast.Assign)
         assert isinstance(value := definition.value, ast.Constant)
 
-        return refactor.ReplacementAction(node, value)
+        return refactor.Replace(node, value)
 
 
 if __name__ == "__main__":

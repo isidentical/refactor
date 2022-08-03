@@ -38,7 +38,7 @@ class LiteralPreservingUnparser(BaseUnparser):
         return {(*token.start, *token.end): token for token in self.tokens}
 
 
-class SwitchPlacesAction(refactor.Action):
+class SwitchPlacesAction(refactor.LazyReplace):
     def build(self):
         new_node = self.branch()
         new_node.op = ast.Sub()
@@ -47,7 +47,7 @@ class SwitchPlacesAction(refactor.Action):
 
 
 class SwitchPlaces(refactor.Rule):
-    def match(self, node: ast.AST) -> refactor.Action:
+    def match(self, node: ast.AST) -> refactor.BaseAction:
         assert isinstance(node, ast.BinOp)
         assert isinstance(node.op, ast.Add)
         return SwitchPlacesAction(node)

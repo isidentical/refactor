@@ -30,7 +30,7 @@ class ImportFinder(refactor.Representative):
 
 
 @dataclass
-class AddNewImport(refactor.NewStatementAction):
+class AddNewImport(refactor.LazyInsertAfter):
     module: str
     names: List[str]
 
@@ -43,7 +43,7 @@ class AddNewImport(refactor.NewStatementAction):
 
 
 @dataclass
-class ModifyExistingImport(refactor.Action):
+class ModifyExistingImport(refactor.LazyReplace):
     name: str
 
     def build(self) -> ast.AST:
