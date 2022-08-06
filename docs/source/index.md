@@ -2,10 +2,13 @@
 :hidden:
 :maxdepth: 1
 
-changelog
+tutorial
+
 faq
-session-and-rules
+changelog
 contributing
+
+glossary
 api-reference
 ```
 
