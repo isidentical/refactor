@@ -1,6 +1,8 @@
 from argparse import Namespace
 from pathlib import Path
 
+__all__ = ["validate_main_inputs"]
+
 _DEFAULT_FILES = [Path("refactors.py"), Path(".refactors/__init__.py")]
 
 

@@ -21,6 +21,15 @@ from typing import (
 
 from refactor import common
 
+__all__ = [
+    "BaseUnparser",
+    "Lines",
+    "PreciseUnparser",
+    "UNPARSER_BACKENDS",
+    "Unparser",
+    "split_lines",
+]
+
 
 @dataclass
 class Lines(UserList):

@@ -8,6 +8,18 @@ from refactor.core import (
 )
 from refactor.runner import run
 
+__all__ = [
+    "Configuration",
+    "Context",
+    "Representative",
+    "Action",
+    "NewStatementAction",
+    "ReplacementAction",
+    "Rule",
+    "Session",
+    "run",
+]
+
 
 def _check_asserts():
     import sys
