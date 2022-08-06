@@ -304,7 +304,7 @@ class PropagateMyConstants(refactor.Rule):
 
 As you can see, once we are in a spot on our contract where we need scope information to decide
 further we access it directly under `self.context`. After accessing to it, we call [`resolve()`](refactor.context.Scope.resolve)
-with the node we want to learn more and it returns a [`ScopeInfo`](refactror.context.ScopeInfo) record.
+with the node we want to learn more and it returns a [`ScopeInfo`](refactor.context.ScopeInfo) record.
 
 ```{tip}
 All initialized context providers can be accessed by their name (actually their name's snake case

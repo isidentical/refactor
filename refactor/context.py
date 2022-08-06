@@ -163,16 +163,21 @@ class Representative:
 
 
 class Ancestry(Representative):
-    def marked(self, node: ast.AST) -> bool:
+    """
+    A context provider that helps you to backtrack nodes
+    using their ancestral chain in AST.
+    """
+
+    def _marked(self, node: ast.AST) -> bool:
         return hasattr(node, "parent")
 
-    def mark(self, parent: ast.AST, field: str, node: Any) -> None:
+    def _mark(self, parent: ast.AST, field: str, node: Any) -> None:
         if isinstance(node, ast.AST):
             node.parent = parent
             node.parent_field = field
 
-    def annotate(self, node: ast.AST) -> None:
-        if self.marked(node):
+    def _annotate(self, node: ast.AST) -> None:
+        if self._marked(node):
             return None
 
         node.parent = None
@@ -181,18 +186,22 @@ class Ancestry(Representative):
             for field, value in ast.iter_fields(parent):
                 if isinstance(value, list):
                     for item in value:
-                        self.mark(parent, field, item)
+                        self._mark(parent, field, item)
                 else:
-                    self.mark(parent, field, value)
+                    self._mark(parent, field, value)
 
-    def ensure_annotated(self) -> None:
-        self.annotate(self.context.tree)
+    def _ensure_annotated(self) -> None:
+        self._annotate(self.context.tree)
 
     def infer(self, node: ast.AST) -> Tuple[str, ast.AST]:
-        self.ensure_annotated()
+        """Return the given `node`'s parent field (the field
+        name in parent which this node is stored in) and the
+        parent."""
+        self._ensure_annotated()
         return (node.parent_field, node.parent)
 
     def traverse(self, node: ast.AST) -> Iterable[Tuple[str, ast.AST]]:
+        """Recursively infer a `node`'s parent field and parent."""
         cursor = node
         while True:
             field, parent = self.infer(cursor)
@@ -203,10 +212,12 @@ class Ancestry(Representative):
             cursor = parent
 
     def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+        """Return the parent AST node of the given `node`."""
         _, parent = self.infer(node)
         return parent
 
     def get_parents(self, node: ast.AST) -> Iterable[ast.AST]:
+        """Recursively yield all the parent AST nodes of the given `node`."""
         for _, parent in self.traverse(node):
             yield parent
 
@@ -235,8 +246,8 @@ class ScopeInfo(common._Singleton):
                 yield cursor
 
     def can_reach(self, other: ScopeInfo) -> bool:
-        """Return whether this scope can access the
-        definitions from 'other' scope."""
+        """Return whether this scope can access definitions
+        from `other` scope."""
         for reachable_scope in self._iter_reachable_scopes():
             if reachable_scope is other:
                 return True
@@ -244,6 +255,10 @@ class ScopeInfo(common._Singleton):
             return False
 
     def get_definitions(self, name: str) -> Optional[List[ast.AST]]:
+        """Return all the definitions of the given `name` that
+        this scope can reach.
+
+        Returns `None` if no definitions are found."""
         for reachable_scope in self._iter_reachable_scopes():
             if reachable_scope.defines(name):
                 return reachable_scope.definitions[name]
@@ -251,10 +266,17 @@ class ScopeInfo(common._Singleton):
             return None
 
     def defines(self, name: str) -> bool:
+        """Return whether this scope defines the given `name`."""
         return name in self.definitions
 
     @cached_property
     def definitions(self) -> Dict[str, List[ast.AST]]:
+        """Return all the definitions made inside this scope.
+
+        .. note::
+            It doesn't include definitions made in child scopes.
+        """
+
         local_definitions: DefaultDict[str, List[ast.AST]] = defaultdict(list)
         for node in common.walk_scope(self.node):
             if isinstance(node, ast.Assign):
@@ -297,6 +319,7 @@ class ScopeInfo(common._Singleton):
 
     @cached_property
     def name(self) -> str:
+        """Return the name of this scope."""
         if self.scope_type is ScopeType.GLOBAL:
             return "<global>"
 
@@ -321,9 +344,13 @@ class ScopeInfo(common._Singleton):
 
 
 class Scope(Representative):
+    """A context provider for working with semantical Python
+    scopes."""
+
     context_providers = (Ancestry,)
 
     def resolve(self, node: ast.AST) -> ScopeInfo:
+        """Return the scope record of the given `node`."""
         if isinstance(node, ast.Module):
             raise ValueError("Can't resolve Module")
 

@@ -10,7 +10,7 @@ from refactor.context import (
     Context,
     Representative,
     Scope,
-    resolve_dependencies,
+    _resolve_dependencies,
 )
 from refactor.core import Rule
 
@@ -18,8 +18,8 @@ from refactor.core import Rule
 def get_context(source, *representatives, **kwargs):
     tree = ast.parse(textwrap.dedent(source))
     config = Configuration(**kwargs)
-    return Context.from_dependencies(
-        resolve_dependencies(representatives),
+    return Context._from_dependencies(
+        _resolve_dependencies(representatives),
         config=config,
         tree=tree,
         source=source,
@@ -293,20 +293,20 @@ def test_dependency_resolver():
     class Rule6(Rule):
         context_providers = (Rep3,)
 
-    assert resolve_dependencies([Rule1]) == set()
-    assert resolve_dependencies([Rule2]) == {Rep1}
-    assert resolve_dependencies([Rule3]) == {Rep1}
-    assert resolve_dependencies([Rule4]) == {Rep1, Rep2}
-    assert resolve_dependencies([Rule5]) == {Rep1, Rep2}
-    assert resolve_dependencies([Rule6]) == {Rep1, Rep2, Rep3}
+    assert _resolve_dependencies([Rule1]) == set()
+    assert _resolve_dependencies([Rule2]) == {Rep1}
+    assert _resolve_dependencies([Rule3]) == {Rep1}
+    assert _resolve_dependencies([Rule4]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule5]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule6]) == {Rep1, Rep2, Rep3}
 
-    assert resolve_dependencies([Rule1, Rule2]) == {Rep1}
-    assert resolve_dependencies([Rule2, Rule3]) == {Rep1}
-    assert resolve_dependencies([Rule1, Rule2, Rule3]) == {Rep1}
-    assert resolve_dependencies([Rule1, Rule2, Rule4]) == {Rep1, Rep2}
-    assert resolve_dependencies([Rule1, Rule5]) == {Rep1, Rep2}
-    assert resolve_dependencies([Rule1, Rule6]) == {Rep1, Rep2, Rep3}
-    assert resolve_dependencies([Rule1, Rule2, Rule5, Rule6]) == {
+    assert _resolve_dependencies([Rule1, Rule2]) == {Rep1}
+    assert _resolve_dependencies([Rule2, Rule3]) == {Rep1}
+    assert _resolve_dependencies([Rule1, Rule2, Rule3]) == {Rep1}
+    assert _resolve_dependencies([Rule1, Rule2, Rule4]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule1, Rule5]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule1, Rule6]) == {Rep1, Rep2, Rep3}
+    assert _resolve_dependencies([Rule1, Rule2, Rule5, Rule6]) == {
         Rep1,
         Rep2,
         Rep3,
@@ -343,7 +343,7 @@ def test_dependency_resolver_recursion():
     class Rule4(Rule):
         context_providers = (Rep4,)
 
-    assert resolve_dependencies([Rule1]) == {Rep1}
-    assert resolve_dependencies([Rule2]) == {Rep2, Rep3}
-    assert resolve_dependencies([Rule3]) == {Rep2, Rep3}
-    assert resolve_dependencies([Rule4]) == {Rep1, Rep2, Rep3, Rep4}
+    assert _resolve_dependencies([Rule1]) == {Rep1}
+    assert _resolve_dependencies([Rule2]) == {Rep2, Rep3}
+    assert _resolve_dependencies([Rule3]) == {Rep2, Rep3}
+    assert _resolve_dependencies([Rule4]) == {Rep1, Rep2, Rep3, Rep4}
