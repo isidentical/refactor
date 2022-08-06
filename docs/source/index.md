@@ -9,6 +9,8 @@ contributing
 api-reference
 ```
 
+(what_is_refactor)=
+
 # Refactor
 
 [![PyPI version](https://badge.fury.io/py/refactor.svg)](https://badge.fury.io/py/refactor)
@@ -26,6 +28,8 @@ transformations". We focus on refactorings that target a small span of
 source code, and work our way out from it. What this enables for us is
 being able to operate directly on a single format for both analyses and
 transformations. This is what we shine at compared to other similar tools.
+
+(small_example)=
 
 ## How?
 
