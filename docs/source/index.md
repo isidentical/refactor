@@ -4,9 +4,9 @@
 
 changelog
 faq
-going-further
-actions
-api
+session-and-rules
+contributing
+api-reference
 ```
 
 # Refactor

@@ -4,7 +4,7 @@ import textwrap
 import pytest
 
 from refactor.common import (
-    Singleton,
+    _Singleton,
     apply_condition,
     find_closest,
     find_indent,
@@ -142,7 +142,7 @@ def test_singleton():
     from dataclasses import dataclass
 
     @dataclass
-    class Point(Singleton):
+    class Point(_Singleton):
         x: int
         y: int
         z: int
