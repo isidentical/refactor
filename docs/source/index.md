@@ -56,8 +56,8 @@ class FillPlaceholders(Rule):
         # based approach (a contract of transformation).
 
         # For this case, our contract is going to be: if the given node
-        # is an identifier with the name of "placeholder", it will replaced
-        # with literal "42".
+        # is an identifier with the name of "placeholder", it will be
+        # replaced with literal "42".
         assert isinstance(node, ast.Name)
         assert node.id == "placeholder"
 

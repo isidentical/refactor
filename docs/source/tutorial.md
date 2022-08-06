@@ -53,7 +53,7 @@ import refactor
 Every rule starts with creating a class that inherits from [`refactor.Rule`](refactor.core.Rule)
 and defines a custom [`match()`](refactor.core.Rule.match) method. The `match()` method is the
 only entry-point to the rule, and it will be called with every node of the tree during the
-treversal (in a breadth-first order).
+traversal (in a breadth-first order).
 
 If the given `node` satisfies the criteria of the rule, then `match()` method can return a
 source code transformation action (which we'll talk about more the next section) and the
