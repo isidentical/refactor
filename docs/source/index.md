@@ -2,55 +2,81 @@
 :hidden:
 :maxdepth: 1
 
-going-further
-actions
-api
+installation
+tutorial
+
+faq
 changelog
+contributing
+
+glossary
+api-reference
 ```
+
+(what_is_refactor)=
 
 # Refactor
 
 [![PyPI version](https://badge.fury.io/py/refactor.svg)](https://badge.fury.io/py/refactor)
+[![Documentation](https://img.shields.io/badge/%3D%3E-Documentation-brightgreen)](https://refactor.readthedocs.io)
 
-Simple, hassle-free, dependency-free, AST based source code refactoring
-toolkit.
+Simple, hassle-free, dependency-free, AST based fragmental source code refactoring
+and transformation toolkit.
 
-## Why? How?
+(why_refactor)=
 
-`refactor` is an end-to-end refactoring framework that is built on top
-of the 'simple but effective refactorings' assumption. It is much easier
-to write a simple script with it rather than trying to figure out what
-sort of a regex you need in order to replace a pattern (if it is even
-matchable with regexes).
+## Why?
 
-Every refactoring rule offers a single entrypoint, `match()`, where they
-accept an `AST` node (from the `ast` module in the standard library) and
-respond with either returning an action to refactor or nothing. If the
-rule succeeds on the input, then the returned action will build a
-replacement node and `refactor` will simply replace the code segment
-that belong to the input with the new version.
+Our framework is primarily built on the principle of "simple but effective
+transformations". We focus on refactorings that target a small span of
+source code, and work our way out from it. What this enables for us is
+being able to operate directly on a single format for both analyses and
+transformations. This is what we shine at compared to other similar tools.
 
-Here is a complete script that will replace every `placeholder` access
-with `42` (not the definitions) on the given list of files:
+(small_example)=
+
+## How?
+
+Let's not get into too much details, but just to give a sneak peek we
+can try to write a rule that would replace the identifier `placeholder`
+with `42`.
 
 ```py
 import ast
-from refactor import Rule, ReplacementAction, run
+from refactor import Rule, Replace, run
 
-class Replace(Rule):
+# Each refactor transformer inherits from "refactor.Rule"
+class FillPlaceholders(Rule):
 
-    def match(self, node):
+    # And each rule implements a "match()" method, which would
+    # receive every node in the tree in a breadth-first order.
+    def match(self, node: ast.AST) -> Replace:
+        # This is where things get interesting. Instead of just writing
+        # filters with if statements, you can use the following assert
+        # based approach (a contract of transformation).
+
+        # For this case, our contract is going to be: if the given node
+        # is an identifier with the name of "placeholder", it will be
+        # replaced with literal "42".
         assert isinstance(node, ast.Name)
-        assert node.id == 'placeholder'
+        assert node.id == "placeholder"
 
+        # And this is where we choose what action we are taking for the
+        # given node (which we have verified with our contract). There
+        # are multiple transformation actions, but in this case what we
+        # need is something that replaces a node with another one.
         replacement = ast.Constant(42)
-        return ReplacementAction(node, replacement)
+        return Replace(node, replacement)
 
 if __name__ == "__main__":
-    run(rules=[Replace])
+    # And finally in here, we just use the default CLI that comes
+    # bundled with refactor. When provided with a bunch of rules,
+    # it creates a simple interface that can process given files
+    # show the diff for changes and even apply them.
+    run(rules=[FillPlaceholders])
 ```
 
-If we run this on a file, `refactor` will print the diff by default;
+If we run the rule above on a file, we can see how it performs:
 
 ```diff
 --- test_file.py
@@ -58,10 +84,10 @@ If we run this on a file, `refactor` will print the diff by default;
 
 @@ -1,11 +1,11 @@
 
- def main():
+def main():
 -    print(placeholder * 3 + 2)
--    print(2 +               placeholder      + 3)
 +    print(42 * 3 + 2)
+-    print(2 +               placeholder      + 3)
 +    print(2 +               42      + 3)
      # some comments
 -    placeholder # maybe other comments
@@ -71,27 +97,6 @@ If we run this on a file, `refactor` will print the diff by default;
 -    print(placeholder)
 +    print(42)
 
- if __name__ == "__main__":
+if __name__ == "__main__":
      main()
 ```
-
-### CST vs AST
-
-It is a common misconception that AST *should not* be used for source code refactorings since
-it doesn't preserve any of the stylings about the code that is visible to humans. Even though
-this statement is partially true, it is wrong on the point of "we can't/shouldn't do any transformations
-through AST". As explained above, we aim to tackle the smaller and simpler problems (e.g refactoring
-simple expressions statements) and while doing that we preserve all details about the surrounding code. And
-even for the stuff in the same line, we preserve as much as we can (e.g refactoring a simple name between 2 different
-operations won't change any style). It is obviously possible to abuse this and do full source refactors, in that case,
-you will lose most of the information, which even though is not preferred, might apply to some use cases (e.g
-feeding the output directly to the interpreter).
-
-We have some great CST implementations ([parso](https://github.com/davidhalter/parso),
-[LibCST](https://github.com/Instagram/LibCST)) and even though they are pretty useful for
-doing major transformations, they can't be expected to keep up with the latest syntax updates
-on the upstream python. It is also an extra layer of indirection in some cases, considering that
-it is a general practice to do analysis on the AST and refactoring on the CST and for most of the
-cases these would be interchangeable through `refactor`. In any scenario, I'd highly recommend you
-to check out these libraries (as well as some tools like [Fixit](https://github.com/Instagram/Fixit))
-if you are interested in doing a considerable amount of source code processing.

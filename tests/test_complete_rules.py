@@ -8,7 +8,8 @@ from typing import List
 import pytest
 
 import refactor
-from refactor import Action, ReplacementAction, Session, common, context
+from refactor import BaseAction, Session, common, context
+from refactor.actions import Replace
 from refactor.context import Scope
 
 
@@ -52,7 +53,7 @@ class ReplaceNexts(refactor.Rule):
             ],
             keywords=[],
         )
-        return ReplacementAction(node, target_func)
+        return Replace(node, target_func)
 
 
 class ReplacePlaceholders(refactor.Rule):
@@ -81,7 +82,7 @@ class ReplacePlaceholders(refactor.Rule):
         assert node.id == "placeholder"
 
         replacement = ast.Constant(42)
-        return refactor.ReplacementAction(node, replacement)
+        return refactor.Replace(node, replacement)
 
 
 class PropagateConstants(refactor.Rule):
@@ -138,7 +139,7 @@ class PropagateConstants(refactor.Rule):
         assert isinstance(definition := definitions[0], ast.Assign)
         assert isinstance(value := definition.value, ast.Constant)
 
-        return refactor.ReplacementAction(node, value)
+        return refactor.Replace(node, value)
 
 
 class ImportFinder(refactor.Representative):
@@ -160,7 +161,7 @@ class ImportFinder(refactor.Representative):
 
 
 @dataclass
-class AddNewImport(refactor.NewStatementAction):
+class AddNewImport(refactor.LazyInsertAfter):
     module: str
     names: List[str]
 
@@ -173,7 +174,7 @@ class AddNewImport(refactor.NewStatementAction):
 
 
 @dataclass
-class ModifyExistingImport(refactor.Action):
+class ModifyExistingImport(refactor.LazyReplace):
     name: str
 
     def build(self):
@@ -246,7 +247,7 @@ class TypingAutoImporter(refactor.Rule):
         return ModifyExistingImport(closest_import, node.id)
 
 
-class AsyncifierAction(refactor.Action):
+class AsyncifierAction(refactor.LazyReplace):
     def build(self):
         new_node = self.branch()
         new_node.__class__ = ast.AsyncFunctionDef
@@ -296,7 +297,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         class Klass:
             def method(self, *, a):
                 print()
-                
+
             lambda self, *, a: print
 
         """
@@ -305,12 +306,12 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         class Klass:
             def method(self, *, a=None):
                 print()
-                
+
             lambda self, *, a=None: print
 
         """
 
-    def match(self, node: ast.AST) -> typing.Optional[Action]:
+    def match(self, node: ast.AST) -> typing.Optional[BaseAction]:
         assert isinstance(node, (ast.FunctionDef, ast.Lambda))
         assert any(kw_default is None for kw_default in node.args.kw_defaults)
 
@@ -346,7 +347,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         target = deepcopy(node)
         target.args.kw_defaults = kw_defaults
 
-        return ReplacementAction(node, target)
+        return Replace(node, target)
 
 
 @pytest.mark.parametrize(

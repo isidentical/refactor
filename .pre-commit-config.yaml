@@ -7,7 +7,7 @@ ci:
 default_language_version:
     python: python3.9
 
-exclude: '^examples/type_literals.py'
+exclude: '^examples/legacy/type_literals.py'
 
 repos:
 -   repo: local

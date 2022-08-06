@@ -12,6 +12,7 @@ from typing import (
     DefaultDict,
     Dict,
     Iterable,
+    Iterator,
     List,
     Optional,
     Protocol,
@@ -28,7 +29,7 @@ from refactor.ast import UNPARSER_BACKENDS, BaseUnparser
 
 @dataclass
 class Configuration:
-    """Configuration settings for refactor.
+    """Configuration settings for a refactoring session.
 
     unparser: precise, fast, or a `BaseUnparser` subclass.
     debug_mode: whether to output more debug information.
@@ -38,12 +39,15 @@ class Configuration:
     debug_mode: bool = False
 
 
-class Dependable(Protocol):
+class _Dependable(Protocol):
     context_providers: ClassVar[Tuple[Type[Representative], ...]]
 
+    def __init__(self, context: Context) -> None:
+        ...
 
-def resolve_dependencies(
-    dependables: Iterable[Type[Dependable]],
+
+def _resolve_dependencies(
+    dependables: Iterable[Type[_Dependable]],
 ) -> Set[Type[Representative]]:
     dependencies: Set[Type[Representative]] = set()
 
@@ -64,6 +68,10 @@ def resolve_dependencies(
 
 @dataclass
 class Context:
+    """The knowledge base of the currently processed module. Includes
+    the original source code, the full AST, as well as the all the representatives.
+    """
+
     source: str
     tree: ast.AST
 
@@ -71,7 +79,24 @@ class Context:
     config: Configuration = field(default_factory=Configuration)
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
+    @classmethod
+    def _from_dependencies(
+        cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
+    ) -> Context:
+        context = cls(**kwargs)
+        context._import_dependencies(dependencies)
+        return context
+
+    def _import_dependencies(
+        self, representatives: Iterable[Type[Representative]]
+    ) -> None:
+        for raw_representative in representatives:
+            representative = raw_representative(self)
+            self.metadata[representative.name] = representative
+
     def unparse(self, node: ast.AST) -> str:
+        """Re-synthesize the source code for the given ``node``."""
+
         unparser_backend = self.config.unparser
         if isinstance(unparser_backend, str):
             if unparser_backend not in UNPARSER_BACKENDS:
@@ -95,6 +120,12 @@ class Context:
         return unparser.unparse(node)  # type: ignore
 
     def __getitem__(self, key: str) -> Representative:
+        # For built-in representatives, we can automatically import them.
+        if key in _BUILTIN_REPRESENTATIVES:
+            self._import_dependencies(
+                _resolve_dependencies([_BUILTIN_REPRESENTATIVES[key]])
+            )
+
         if key not in self.metadata:
             raise ValueError(
                 f"{key!r} provider is not available on this context "
@@ -103,29 +134,27 @@ class Context:
             )
         return self.metadata[key]
 
-    @classmethod
-    def from_dependencies(
-        cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
-    ) -> Context:
-        context = cls(**kwargs)
-        representatives = [dependency(context) for dependency in dependencies]
-        context.metadata.update(
-            {
-                representative.name: representative
-                for representative in representatives
-            }
-        )
-        return context
+    def __getattr__(self, attr: str) -> Representative:
+        try:
+            return self[attr]
+        except ValueError:
+            raise AttributeError(f"{self!r} has no attribute {attr!r}")
 
 
 @dataclass
 class Representative:
+    """A tree-scoped metadata collector."""
+
     context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
 
     context: Context
 
     @cached_property
     def name(self) -> str:
+        """Name of the representative (to be used when accessing
+        from the scope). By default, it is the snake case version
+        of the class' name."""
+
         self_type = type(self)
         if self_type is Representative:
             return "<base>"
@@ -134,16 +163,21 @@ class Representative:
 
 
 class Ancestry(Representative):
-    def marked(self, node: ast.AST) -> bool:
+    """
+    A context provider that helps you to backtrack nodes
+    using their ancestral chain in AST.
+    """
+
+    def _marked(self, node: ast.AST) -> bool:
         return hasattr(node, "parent")
 
-    def mark(self, parent: ast.AST, field: str, node: Any) -> None:
+    def _mark(self, parent: ast.AST, field: str, node: Any) -> None:
         if isinstance(node, ast.AST):
             node.parent = parent
             node.parent_field = field
 
-    def annotate(self, node: ast.AST) -> None:
-        if self.marked(node):
+    def _annotate(self, node: ast.AST) -> None:
+        if self._marked(node):
             return None
 
         node.parent = None
@@ -152,18 +186,22 @@ class Ancestry(Representative):
             for field, value in ast.iter_fields(parent):
                 if isinstance(value, list):
                     for item in value:
-                        self.mark(parent, field, item)
+                        self._mark(parent, field, item)
                 else:
-                    self.mark(parent, field, value)
+                    self._mark(parent, field, value)
 
-    def ensure_annotated(self) -> None:
-        self.annotate(self.context.tree)
+    def _ensure_annotated(self) -> None:
+        self._annotate(self.context.tree)
 
     def infer(self, node: ast.AST) -> Tuple[str, ast.AST]:
-        self.ensure_annotated()
+        """Return the given `node`'s parent field (the field
+        name in parent which this node is stored in) and the
+        parent."""
+        self._ensure_annotated()
         return (node.parent_field, node.parent)
 
     def traverse(self, node: ast.AST) -> Iterable[Tuple[str, ast.AST]]:
+        """Recursively infer a `node`'s parent field and parent."""
         cursor = node
         while True:
             field, parent = self.infer(cursor)
@@ -174,10 +212,12 @@ class Ancestry(Representative):
             cursor = parent
 
     def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+        """Return the parent AST node of the given `node`."""
         _, parent = self.infer(node)
         return parent
 
     def get_parents(self, node: ast.AST) -> Iterable[ast.AST]:
+        """Recursively yield all the parent AST nodes of the given `node`."""
         for _, parent in self.traverse(node):
             yield parent
 
@@ -190,30 +230,53 @@ class ScopeType(Enum):
 
 
 @dataclass(unsafe_hash=True)
-class ScopeInfo(common.Singleton):
+class ScopeInfo(common._Singleton):
     node: ast.AST
     scope_type: ScopeType
     parent: Optional[ScopeInfo] = field(default=None, repr=False)
 
-    def can_reach(self, other: ScopeInfo) -> bool:
-        if other.scope_type is ScopeType.GLOBAL:
-            return True
-        elif self is other:
-            return True
+    def _iter_reachable_scopes(self) -> Iterator[ScopeInfo]:
+        yield self
 
-        cursor = self
+        cursor: ScopeInfo = self
+        # TODO: implement a more fine grained scope resolution with support
+        # for nested comprehensions.
         while cursor := cursor.parent:  # type: ignore
-            if cursor is other:
-                if other.scope_type is ScopeType.FUNCTION:
-                    return True
+            if cursor.scope_type in (ScopeType.FUNCTION, ScopeType.GLOBAL):
+                yield cursor
+
+    def can_reach(self, other: ScopeInfo) -> bool:
+        """Return whether this scope can access definitions
+        from `other` scope."""
+        for reachable_scope in self._iter_reachable_scopes():
+            if reachable_scope is other:
+                return True
         else:
             return False
 
+    def get_definitions(self, name: str) -> Optional[List[ast.AST]]:
+        """Return all the definitions of the given `name` that
+        this scope can reach.
+
+        Returns `None` if no definitions are found."""
+        for reachable_scope in self._iter_reachable_scopes():
+            if reachable_scope.defines(name):
+                return reachable_scope.definitions[name]
+        else:
+            return None
+
     def defines(self, name: str) -> bool:
+        """Return whether this scope defines the given `name`."""
         return name in self.definitions
 
     @cached_property
     def definitions(self) -> Dict[str, List[ast.AST]]:
+        """Return all the definitions made inside this scope.
+
+        .. note::
+            It doesn't include definitions made in child scopes.
+        """
+
         local_definitions: DefaultDict[str, List[ast.AST]] = defaultdict(list)
         for node in common.walk_scope(self.node):
             if isinstance(node, ast.Assign):
@@ -256,6 +319,7 @@ class ScopeInfo(common.Singleton):
 
     @cached_property
     def name(self) -> str:
+        """Return the name of this scope."""
         if self.scope_type is ScopeType.GLOBAL:
             return "<global>"
 
@@ -280,9 +344,13 @@ class ScopeInfo(common.Singleton):
 
 
 class Scope(Representative):
+    """A context provider for working with semantical Python
+    scopes."""
+
     context_providers = (Ancestry,)
 
     def resolve(self, node: ast.AST) -> ScopeInfo:
+        """Return the scope record of the given `node`."""
         if isinstance(node, ast.Module):
             raise ValueError("Can't resolve Module")
 
@@ -310,3 +378,9 @@ class Scope(Representative):
 
         assert scope is not None
         return scope
+
+
+_BUILTIN_REPRESENTATIVES = {
+    "ancestry": Ancestry,
+    "scope": Scope,
+}

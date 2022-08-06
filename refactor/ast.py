@@ -32,14 +32,22 @@ class Lines(UserList):
         self.lines = self.data
 
     def join(self) -> str:
+        """Return the combined source code."""
         source = "\n".join(self.data)
         if self.trailing_newline:
             source += "\n"
         return source
 
     def apply_indentation(
-        self, indentation: str, *, start_prefix: str = "", end_suffix: str = ""
+        self,
+        indentation: str,
+        *,
+        start_prefix: str = "",
+        end_suffix: str = "",
     ) -> None:
+        """Apply the given indentation, optionally with start and end prefixes
+        to the bound source lines."""
+
         for index, line in enumerate(self.data):
             if index == 0:
                 self.data[index] = indentation + start_prefix + line
@@ -51,6 +59,9 @@ class Lines(UserList):
 
 
 def split_lines(source: str) -> Lines:
+    """Split the given source code into lines and
+    return a list-like object (:py:class:`refactor.ast.Lines`)."""
+
     # TODO: https://github.com/python/cpython/blob/83d1430ee5b8008631e7f2a75447e740eed065c1/Lib/ast.py#L299-L321
     trailing_newline = False
     if len(source) >= 1:
@@ -68,12 +79,8 @@ class Unparser(Protocol):
 
 
 class BaseUnparser(ast._Unparser):  # type: ignore
-    # Normally ast._Unparser is a private API
-    # though since it doesn't tend to change
-    # often, we could simply have a base class
-    # which will act like a wrapper for backwards
-    # incompatible changes and let the refactor
-    # users to override it.
+    """A public :py:class:`ast._Unparser` API that can
+    be used to customize the AST re-synthesis process."""
 
     source: Optional[str]
 
@@ -98,11 +105,9 @@ class BaseUnparser(ast._Unparser):  # type: ignore
 
 
 class PreciseUnparser(BaseUnparser):
-    """
-    Try to locate precise textual versions of child nodes by
-    bi-directional AST equivalence with the versions that exist
-    on the source.
-    """
+    """A more precise version of the default unparser,
+    with various improvements such as comment handling
+    for major statements and child node recovery."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self._visited_comment_lines: Set[int] = set()

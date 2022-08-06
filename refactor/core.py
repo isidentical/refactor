@@ -1,100 +1,29 @@
 from __future__ import annotations
 
 import ast
-import copy
 import tempfile
 import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type, cast
+from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type
 
-from refactor.ast import split_lines
+# TODO: remove the deprecated aliases on 1.0.0
+from refactor.actions import (  # unimport:skip
+    Action,
+    BaseAction,
+    NewStatementAction,
+    ReplacementAction,
+    TargetedNewStatementAction,
+)
 from refactor.change import Change
-from refactor.common import find_indent, has_positions
+from refactor.common import has_positions
 from refactor.context import (
     Configuration,
     Context,
     Representative,
-    resolve_dependencies,
+    _resolve_dependencies,
 )
-
-
-@dataclass
-class Action:
-    """Base class for all actions.
-
-    Override the `build()` method to programmatically build
-    the replacement nodes.
-    """
-
-    node: ast.AST
-
-    def apply(self, context: Context, source: str) -> str:
-        """Refactor a source segment in the given string."""
-        lines = split_lines(source)
-        view = slice(self.node.lineno - 1, self.node.end_lineno)
-
-        target_lines = lines[view]
-        indentation, start_prefix = find_indent(
-            target_lines[0][: self.node.col_offset]
-        )
-        end_prefix = target_lines[-1][self.node.end_col_offset :]
-
-        replacement = split_lines(context.unparse(self.build()))
-        replacement.apply_indentation(
-            indentation, start_prefix=start_prefix, end_suffix=end_prefix
-        )
-
-        lines[view] = replacement
-        return lines.join()
-
-    def build(self) -> ast.AST:
-        """Create the replacement node."""
-        raise NotImplementedError
-
-    def branch(self) -> ast.AST:
-        """Return a copy view of the original node."""
-        return copy.deepcopy(self.node)
-
-
-@dataclass
-class ReplacementAction(Action):
-    """An action for replacing the `node` with
-    the given `target` node."""
-
-    node: ast.AST
-    target: ast.AST
-
-    def build(self) -> ast.AST:
-        return self.target
-
-
-class NewStatementAction(Action):
-    """An action base for adding a new statement right after
-    the given `node`."""
-
-    def apply(self, context: Context, source: str) -> str:
-        lines = split_lines(source)
-
-        start_line = lines[self.node.lineno - 1]
-        indentation, start_prefix = find_indent(
-            start_line[: self.node.col_offset]
-        )
-
-        replacement = split_lines(context.unparse(self.build()))
-        replacement.apply_indentation(indentation, start_prefix=start_prefix)
-
-        end_line = cast(int, self.node.end_lineno)
-        for line in reversed(replacement):
-            lines.insert(end_line, line)
-
-        return lines.join()
-
-
-class TargetedNewStatementAction(ReplacementAction, NewStatementAction):
-    """An action for appending the given `target` node
-    right after the `node`."""
 
 
 @dataclass
@@ -104,14 +33,18 @@ class Rule:
     context: Context
 
     def check_file(self, path: Optional[Path]) -> bool:
-        """Check whether to process this file or not. If returned
-        a false value, the rule will be deactivated for this file."""
+        """Check whether to process the given ``path``.
+
+        By default it will always be `True` but can be overridden
+        in subclasses.
+        """
         return True
 
-    def match(self, node: ast.AST) -> Optional[Action]:
-        """Match the node against the current refactoring rule.
+    def match(self, node: ast.AST) -> Optional[BaseAction]:
+        """Match the given ``node`` against current rule's scope.
 
-        On success, it will return an `Action` instance. On fail
+        On success, it will return a source code transformation action
+        (an instance of :class:`refactor.actions.BaseAction`). On failure
         it might either raise an `AssertionError` or return `None`.
         """
         raise NotImplementedError
@@ -119,7 +52,8 @@ class Rule:
 
 @dataclass
 class Session:
-    """A refactoring session."""
+    """A refactoring session that consists of a set of rules and a configuration.
+    """
 
     rules: List[Type[Rule]] = field(default_factory=list)
     config: Configuration = field(default_factory=Configuration)
@@ -127,8 +61,8 @@ class Session:
     def _initialize_rules(
         self, tree: ast.Module, source: str, file: Optional[Path]
     ) -> List[Rule]:
-        context = Context.from_dependencies(
-            resolve_dependencies(self.rules),
+        context = Context._from_dependencies(
+            _resolve_dependencies(self.rules),
             tree=tree,
             source=source,
             file=file,
@@ -168,6 +102,7 @@ class Session:
                             return self._run(
                                 new_source,
                                 _changed=True,
+                                file=file,
                                 _known_sources=_known_sources,
                             )
 
@@ -190,16 +125,22 @@ class Session:
         raise ValueError(error_message) from exc
 
     def run(self, source: str, *, file: Optional[Path] = None) -> str:
-        """Refactor the given string with the rules bound to
-        this session."""
+        """Apply all the rules from this session to the given ``source``
+        and return the transformed version.
+
+        In case of the given `source` is not parsable, it will return
+        it unchanged.
+        """
 
         source, _ = self._run(source)
         return source
 
     def run_file(self, file: Path) -> Optional[Change]:
-        """Refactor the given file, and return a Change object
-        containing the refactored version. If nothing changes, return
-        None."""
+        """Apply all the rules from this session to the given ``file``
+        and return a :class:`refactor.Change` if any changes were made.
+
+        In case of the given file is not parsable, it will return `None`.
+        """
 
         try:
             with tokenize.open(file) as stream:

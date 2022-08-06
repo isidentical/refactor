@@ -13,17 +13,21 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    TypeVar,
     cast,
 )
 
+C = TypeVar("C")
+
 
 def negate(node: ast.expr) -> ast.UnaryOp:
-    """Negate the given `node`."""
+    """Negate the given ``node``."""
     return ast.UnaryOp(op=ast.Not(), operand=node)
 
 
 def apply_condition(condition: bool, node: ast.expr) -> ast.expr:
-    """Negate the node if `condition` is a falsy value."""
+    """Negate the given ``node`` if the given ``condition`` is
+    a falsy value."""
     if condition:
         return node
     else:
@@ -126,7 +130,7 @@ def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
 
 
 def pascal_to_snake(name: str) -> str:
-    """Convert a name written in pascal case notation to
+    """Convert the given ``name`` from pascal case to
     snake case."""
 
     new_string = str()
@@ -150,8 +154,8 @@ def find_indent(source: str) -> Tuple[str, str]:
 
 
 def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
-    """Find the closest node against given sequence
-    of targets (absolute distance from starting points)."""
+    """Find the closest node to the given ``node`` from the given
+    sequence of ``targets`` (uses absolute distance from starting points)."""
     if not len(targets) >= 1:
         raise ValueError("condition failed: len(targets) >= 1")
 
@@ -170,6 +174,12 @@ def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     return sorted_targets[0]
 
 
+def extract_from_text(text: str) -> ast.AST:
+    """Extract the first AST node from the given ``text``'s
+    parsed AST."""
+    return ast.parse(text).body[0]
+
+
 _POSITIONAL_ATTRIBUTES = (
     "lineno",
     "col_offset",
@@ -181,13 +191,13 @@ _POSITIONAL_ATTRIBUTES_SET = frozenset(_POSITIONAL_ATTRIBUTES)
 
 @cache  # type: ignore
 def has_positions(node_type: Type[ast.AST]) -> bool:
-    """Return `True` if the given `node_type` tracks
+    """Return `True` if the given ``node_type`` tracks
     source positions."""
     return _POSITIONAL_ATTRIBUTES_SET.issubset(node_type._attributes)
 
 
 def position_for(node: ast.AST) -> Tuple[int, int, int, int]:
-    """Return a 4-item tuple of positions for the given node."""
+    """Return a 4-item tuple of positions for the given ``node``."""
     positions = tuple(
         getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES
     )
@@ -204,7 +214,7 @@ def unpack_lhs(node: ast.AST) -> Iterator[str]:
 
 
 def walk_scope(node: ast.AST) -> Iterator[ast.AST]:
-    """Like regular ast.walk() but only walks within the
+    """Like regular :py:func:`ast.walk` but only walks within the
     current scope."""
     todo = deque(_walker(node))
     while todo:
@@ -283,11 +293,20 @@ def _walk_optional(node: Optional[ast.AST]) -> Iterator[ast.AST]:
         yield node
 
 
-class Singleton:
+class _Singleton:
     def __init_subclass__(cls) -> None:
-        cls._instances: Dict[Tuple[Any, ...], Singleton] = {}  # type: ignore
+        cls._instances: Dict[Tuple[Any, ...], _Singleton] = {}  # type: ignore
 
-    def __new__(cls, *args: Any) -> Singleton:
+    def __new__(cls, *args: Any) -> _Singleton:
         if not cls._instances.get(args):
             cls._instances[args] = super().__new__(cls)
         return cls._instances[args]
+
+
+def _hint(handler: str, *args: Any, **kwargs: Any) -> Callable[[C], C]:
+    """Internal hint function for global refactors."""
+
+    def wrapper(obj: C) -> C:
+        return obj
+
+    return wrapper

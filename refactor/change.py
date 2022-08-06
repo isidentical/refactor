@@ -8,13 +8,19 @@ from refactor.ast import split_lines
 
 @dataclass
 class Change:
+    """The result of a transformation in the bound file.
+
+    Includes both the original source code, and the transformed
+    variant.
+    """
+
     file: Path
     original_source: str
     refactored_source: str
 
-    def compute_diff(self):
-        """Compute the line-based diff between original
-        and the refactored source lines."""
+    def compute_diff(self) -> str:
+        """Compute the line-based diff between original and the
+        refactored source lines."""
         original_lines = split_lines(self.original_source)
         refactored_lines = split_lines(self.refactored_source)
 
@@ -27,6 +33,7 @@ class Change:
             )
         )
 
-    def apply_diff(self):
+    def apply_diff(self) -> None:
+        """Apply the transformed version to the bound file."""
         with open(self.file, "w") as stream:
             stream.write(self.refactored_source)

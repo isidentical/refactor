@@ -5,15 +5,10 @@ import textwrap
 
 import pytest
 
+from refactor.actions import InsertAfter, LazyReplace, Replace
 from refactor.change import Change
 from refactor.context import Configuration, Context, Representative
-from refactor.core import (
-    Action,
-    ReplacementAction,
-    Rule,
-    Session,
-    TargetedNewStatementAction,
-)
+from refactor.core import Rule, Session
 
 fake_ctx = Context(source="<test>", tree=ast.AST())
 
@@ -43,7 +38,7 @@ fake_ctx = Context(source="<test>", tree=ast.AST())
 )
 def test_apply_simple(source, expected, target_func, replacement):
     tree = ast.parse(source)
-    action = ReplacementAction(target_func(tree), replacement)
+    action = Replace(target_func(tree), replacement)
     assert action.apply(fake_ctx, source) == expected
 
 
@@ -74,11 +69,11 @@ def test_apply_new_statement(source, expected, target_func):
 
     tree = ast.parse(source)
     original_node = target_func(tree)
-    action = TargetedNewStatementAction(original_node, original_node)
+    action = InsertAfter(original_node, original_node)
     assert action.apply(fake_ctx, source) == expected
 
 
-class SimpleAction(Action):
+class SimpleAction(LazyReplace):
     def build(self):
         node = self.branch()
         node.op = ast.Sub()
@@ -107,9 +102,7 @@ class PlaceholderReplacer(Rule):
         assert isinstance(node, ast.Name)
         assert node.id == "placeholder"
 
-        return ReplacementAction(
-            node, self.context["simple"].infer_value(node)
-        )
+        return Replace(node, self.context["simple"].infer_value(node))
 
 
 @pytest.mark.parametrize(
@@ -199,7 +192,7 @@ def test_session_run_file(tmp_path):
     assert paths == {file_1, file_2}
 
 
-class MirrorAction(Action):
+class MirrorAction(LazyReplace):
     def build(self):
         return self.node
 
@@ -220,7 +213,7 @@ def test_session_run_deterministic():
 class InvalidRule(Rule):
     def match(self, node):
         assert isinstance(node, ast.Name)
-        return ReplacementAction(node, ast.Name("!id"))
+        return Replace(node, ast.Name("!id"))
 
 
 def test_session_run_invalid_code():
@@ -266,7 +259,7 @@ class ChangeSign(Rule):
         else:
             return None
 
-        return ReplacementAction(node, new_node)
+        return Replace(node, new_node)
 
 
 def test_session_run_deterministic_for_on_off_rules():
