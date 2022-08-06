@@ -25,11 +25,12 @@ __all__ = [
 
 
 class BaseAction:
-    """A source code editing action."""
+    """A source code transformation action."""
 
     def apply(self, context: Context, source: str) -> str:
-        """Takes the source code for the module we are processing,
-        as well as the current context and returns a modified version of it."""
+        """Takes the bound :py:class:`refactor.context.Context` and
+        the source code of the current module and returns the transformed
+        version."""
         raise NotImplementedError
 
 
@@ -61,9 +62,14 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
 @_hint("deprecated_alias", "Action")
 @dataclass
 class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
-    """Replaces the code segment of the given
-    node with the re-synthesized version of the
-    built target (via build())."""
+    """Transforms the code segment of the given `node` with
+    the re-synthesized version :py:meth:`LazyReplace.build`'s
+    output.
+
+    .. note::
+        Subclasses of :py:class:`LazyReplace` must override
+        :py:meth:`LazyReplace.build`.
+    """
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
@@ -92,9 +98,8 @@ class Action(LazyReplace, _DeprecatedAliasMixin):
 @_hint("deprecated_alias", "ReplacementAction")
 @dataclass
 class Replace(LazyReplace):
-    """Replaces the code segment of the given
-    node with the re-synthesized version of the
-    given target."""
+    """Transforms the code segment of the given `node` with
+    the re-synthesized version of `target`."""
 
     target: ast.AST
 
@@ -110,8 +115,16 @@ class ReplacementAction(Replace, _DeprecatedAliasMixin):
 @_hint("deprecated_alias", "NewStatementAction")
 @dataclass
 class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
-    """Inserts the built target right
-    after the given node."""
+    """Inserts the re-synthesized version :py:meth:`LazyInsertAfter.build`'s
+    output right after the given `node`.
+
+    .. note::
+        Subclasses of :py:class:`LazyInsertAfter` must override
+        :py:meth:`LazyInsertAfter.build`.
+
+    .. note::
+        This action requires both the `node` and the built target to be statements.
+    """
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
@@ -139,8 +152,12 @@ class NewStatementAction(LazyInsertAfter, _DeprecatedAliasMixin):
 @_hint("deprecated_alias", "TargetedNewStatementAction")
 @dataclass
 class InsertAfter(LazyInsertAfter):
-    """Inserts the given target right
-    after the given node."""
+    """Inserts the re-synthesized version of given `target` right after
+    the given `node`.
+
+    .. note::
+        This action requires both the `node` and `target` to be a statements.
+    """
 
     target: ast.stmt
 

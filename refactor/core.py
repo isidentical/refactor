@@ -22,7 +22,7 @@ from refactor.context import (
     Configuration,
     Context,
     Representative,
-    resolve_dependencies,
+    _resolve_dependencies,
 )
 
 
@@ -33,14 +33,18 @@ class Rule:
     context: Context
 
     def check_file(self, path: Optional[Path]) -> bool:
-        """Check whether to process this file or not. If returned
-        a false value, the rule will be deactivated for this file."""
+        """Check whether to process the given ``path``.
+
+        By default it will always be `True` but can be overridden
+        in subclasses.
+        """
         return True
 
     def match(self, node: ast.AST) -> Optional[BaseAction]:
-        """Match the node against the current refactoring rule.
+        """Match the given ``node`` against current rule's scope.
 
-        On success, it will return an `Action` instance. On fail
+        On success, it will return a source code transformation action
+        (an instance of :class:`refactor.actions.BaseAction`). On failure
         it might either raise an `AssertionError` or return `None`.
         """
         raise NotImplementedError
@@ -48,7 +52,8 @@ class Rule:
 
 @dataclass
 class Session:
-    """A refactoring session."""
+    """A refactoring session that consists of a set of rules and a configuration.
+    """
 
     rules: List[Type[Rule]] = field(default_factory=list)
     config: Configuration = field(default_factory=Configuration)
@@ -56,8 +61,8 @@ class Session:
     def _initialize_rules(
         self, tree: ast.Module, source: str, file: Optional[Path]
     ) -> List[Rule]:
-        context = Context.from_dependencies(
-            resolve_dependencies(self.rules),
+        context = Context._from_dependencies(
+            _resolve_dependencies(self.rules),
             tree=tree,
             source=source,
             file=file,
@@ -120,16 +125,22 @@ class Session:
         raise ValueError(error_message) from exc
 
     def run(self, source: str, *, file: Optional[Path] = None) -> str:
-        """Refactor the given string with the rules bound to
-        this session."""
+        """Apply all the rules from this session to the given ``source``
+        and return the transformed version.
+
+        In case of the given `source` is not parsable, it will return
+        it unchanged.
+        """
 
         source, _ = self._run(source)
         return source
 
     def run_file(self, file: Path) -> Optional[Change]:
-        """Refactor the given file, and return a Change object
-        containing the refactored version. If nothing changes, return
-        None."""
+        """Apply all the rules from this session to the given ``file``
+        and return a :class:`refactor.Change` if any changes were made.
+
+        In case of the given file is not parsable, it will return `None`.
+        """
 
         try:
             with tokenize.open(file) as stream:

@@ -29,7 +29,7 @@ from refactor.ast import UNPARSER_BACKENDS, BaseUnparser
 
 @dataclass
 class Configuration:
-    """Configuration settings for refactor.
+    """Configuration settings for a refactoring session.
 
     unparser: precise, fast, or a `BaseUnparser` subclass.
     debug_mode: whether to output more debug information.
@@ -39,15 +39,15 @@ class Configuration:
     debug_mode: bool = False
 
 
-class Dependable(Protocol):
+class _Dependable(Protocol):
     context_providers: ClassVar[Tuple[Type[Representative], ...]]
 
     def __init__(self, context: Context) -> None:
         ...
 
 
-def resolve_dependencies(
-    dependables: Iterable[Type[Dependable]],
+def _resolve_dependencies(
+    dependables: Iterable[Type[_Dependable]],
 ) -> Set[Type[Representative]]:
     dependencies: Set[Type[Representative]] = set()
 
@@ -68,6 +68,10 @@ def resolve_dependencies(
 
 @dataclass
 class Context:
+    """The knowledge base of the currently processed module. Includes
+    the original source code, the full AST, as well as the all the representatives.
+    """
+
     source: str
     tree: ast.AST
 
@@ -76,14 +80,14 @@ class Context:
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
     @classmethod
-    def from_dependencies(
+    def _from_dependencies(
         cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
     ) -> Context:
         context = cls(**kwargs)
-        context.import_dependencies(dependencies)
+        context._import_dependencies(dependencies)
         return context
 
-    def import_dependencies(
+    def _import_dependencies(
         self, representatives: Iterable[Type[Representative]]
     ) -> None:
         for raw_representative in representatives:
@@ -91,6 +95,8 @@ class Context:
             self.metadata[representative.name] = representative
 
     def unparse(self, node: ast.AST) -> str:
+        """Re-synthesize the source code for the given ``node``."""
+
         unparser_backend = self.config.unparser
         if isinstance(unparser_backend, str):
             if unparser_backend not in UNPARSER_BACKENDS:
@@ -116,8 +122,8 @@ class Context:
     def __getitem__(self, key: str) -> Representative:
         # For built-in representatives, we can automatically import them.
         if key in _BUILTIN_REPRESENTATIVES:
-            self.import_dependencies(
-                resolve_dependencies([_BUILTIN_REPRESENTATIVES[key]])
+            self._import_dependencies(
+                _resolve_dependencies([_BUILTIN_REPRESENTATIVES[key]])
             )
 
         if key not in self.metadata:
@@ -137,12 +143,18 @@ class Context:
 
 @dataclass
 class Representative:
+    """A tree-scoped metadata collector."""
+
     context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
 
     context: Context
 
     @cached_property
     def name(self) -> str:
+        """Name of the representative (to be used when accessing
+        from the scope). By default, it is the snake case version
+        of the class' name."""
+
         self_type = type(self)
         if self_type is Representative:
             return "<base>"
@@ -207,7 +219,7 @@ class ScopeType(Enum):
 
 
 @dataclass(unsafe_hash=True)
-class ScopeInfo(common.Singleton):
+class ScopeInfo(common._Singleton):
     node: ast.AST
     scope_type: ScopeType
     parent: Optional[ScopeInfo] = field(default=None, repr=False)
