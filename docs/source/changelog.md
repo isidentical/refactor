@@ -19,12 +19,13 @@ For migrating your code base to the new style actions, we wrote a small tool (th
 
 - Added experimental Windows support, contributed by [Hakan Celik](https://github.com/hakancelikdev)
 - `common.find_closest` now takes `end_lineno` and `end_col_offset` into account. It also ensures there is at least one target node.
-- Added `debug_mode` setting to `refactor.context.Configuration`
+- Added `debug_mode` setting to `refactor.context.Configuration`.
 - Added a command-line flag (`-d`/`--enable-debug-mode`) to the default CLI runner to change session's configuration.
 - When unparsable source code is generated, the contents can be now seen if the debug mode is enabled.
 - \[Experimental\] Added ability to *partially* recover floating comments (from preceding or succeeding lines) bound to statements.
 - The context providers now can be accessed with attribute notation, e.g. `self.context.scope` instead of `self.context.metadata["scope]`.
 - If you access a built-in context provider (scope/ancestry) and it is not already imported, we auto-import it. So most common context providers are now ready to be used.
+- Added `common.next_statement_of`.
 
 ## 0.4.4
 

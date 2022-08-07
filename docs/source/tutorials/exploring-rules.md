@@ -17,7 +17,7 @@ would transform that operation into its result.
 ```{code-block} python
 ---
 name: tutorial-program
-emphasize-lines: 10,14,16
+emphasize-lines: 10, 14, 16
 caption: Our example program (with highlighted lines showing what parts we can transform)
 ---
 PI = 3.14
@@ -38,11 +38,11 @@ def make_computation(x: int, y: int, z: int) -> float:
     return 3.14 - 6.28 + result + z * 2
 ```
 
-(what_is_a_rule=)
+(what_is_a_rule)=
 
 ### "contract" + "transformation" = "rule"
 
-Each transformation in Refactor corresponds to a ["rule"](refactor.core.Rule), an abstract
+Each separate analyzer in Refactor corresponds to a ["rule"](refactor.core.Rule), an abstract
 component that would structurally hold the information regarding what we are looking for
 (e.g., an addition operation) and how we would transform the source code if we find what
 we are looking for.
@@ -248,7 +248,7 @@ been folded if they were used as constants instead of names.
 
 ```{code-block} python
 ---
-emphasize-lines: 2,6
+emphasize-lines: 2, 6
 ---
 PI = 3.14
 TAU = PI + PI
@@ -269,7 +269,7 @@ with our [constant folding](https://en.wikipedia.org/wiki/Constant_folding) impl
 
 ```{code-block} python
 ---
-emphasize-lines: 1,4
+emphasize-lines: 1, 4
 ---
 from refactor.context import Scope
 

@@ -4,6 +4,7 @@ import ast
 from collections import deque
 from functools import cache, singledispatch, wraps
 from typing import (
+    TYPE_CHECKING,
     Any,
     Callable,
     Dict,
@@ -16,6 +17,9 @@ from typing import (
     TypeVar,
     cast,
 )
+
+if TYPE_CHECKING:
+    from refactor.context import Context
 
 C = TypeVar("C")
 
@@ -211,6 +215,21 @@ def unpack_lhs(node: ast.AST) -> Iterator[str]:
             yield from unpack_lhs(element)
     else:
         yield ast.unparse(node)
+
+
+def next_statement_of(node: ast.stmt, context: Context) -> Optional[ast.stmt]:
+    """Get the statement that follows ``node`` in the same syntactical block.
+    """
+    parent_field, parent = context.ancestry.infer(node)
+    parent_field_val = getattr(parent, parent_field)
+    if not isinstance(parent_field_val, list):
+        return None
+
+    index = parent_field_val.index(node)
+    try:
+        return parent_field_val[index + 1]
+    except IndexError:
+        return None
 
 
 def walk_scope(node: ast.AST) -> Iterator[ast.AST]:

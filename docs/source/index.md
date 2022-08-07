@@ -11,6 +11,7 @@ installation
 :maxdepth: 1
 
 tutorials/exploring-rules
+tutorials/actions
 tutorials/programmatic-api
 ```
 

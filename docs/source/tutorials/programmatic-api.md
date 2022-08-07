@@ -9,8 +9,8 @@ sort of input. You might want to use this API if you are interested in:
 
 ## Sessions
 
-We talked about how each transformation corresponds to a rule in the [previous tutorial](what_is_a_rule),
-and a ["session"](refactor.core.Session) is just a bunch of rules combined together.
+A ["session"](refactor.core.Session) is a collection of {term}`rule`s that will run together on the
+same {term}`context`.
 
 ```pycon
 >>> from refactor import Session
