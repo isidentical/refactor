@@ -4,8 +4,8 @@
 
 ### Major
 
-This release includes the overhaul of our action system, and with the next release we will be starting deprecating the old ones. A list
-of changes:
+This release includes the overhaul of our action system, and with the next releases we will start removing the old ones. A list
+of changes regarding actions can be seen here:
 
 - `refactor.core` no longer contains any actions (the deprecated aliases are still imported and exposed but all the new actions go into `refactor.actions`)
 - `Action` is now split into two, a `refactor.actions.BaseAction` which is the base of all actions (useful for type hinting) and a `refactor.actions.LazyReplace` (a replace action that builds the node lazily in its `build()`).
