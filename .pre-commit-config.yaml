@@ -45,13 +45,13 @@ repos:
         args:
         -   --remove
         -   --ignore-init
--   repo: https://github.com/executablebooks/mdformat/
-    rev: 0.7.14
-    hooks:
-    -   id: mdformat
-        additional_dependencies:
-        - mdformat_tables
-        - mdformat-black
+# -   repo: https://github.com/executablebooks/mdformat/
+#     rev: 0.7.14
+#     hooks:
+#     -   id: mdformat
+#         additional_dependencies:
+#         - mdformat_tables
+#         - mdformat-black
 -   repo: https://github.com/codespell-project/codespell
     rev: v2.1.0
     hooks:
