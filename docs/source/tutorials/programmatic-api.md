@@ -45,10 +45,10 @@ ones).
 If you pass a problematic source code (e.g. code that contains invalid syntax), it won't raise any errors and will return the given source code unchanged.
 
 :::{code-block} pycon
-
-> > > session.run("$$$ invalid $$$")
-> > > '$$$ invalid $$$'
-> > > :::
+>>> session.run("$$$ invalid $$$")
+>>> '$$$ invalid $$$'
+>>>
+:::
 
 ::::
 
