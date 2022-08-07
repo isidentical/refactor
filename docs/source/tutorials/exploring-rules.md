@@ -1,4 +1,4 @@
-# Tutorial
+# Your first Refactor rule
 
 If you have already read [what is Refactor](what_is_refactor) and curious to learn
 more about how to actually use it, this is where you should start. In this example,
@@ -37,6 +37,8 @@ def make_computation(x: int, y: int, z: int) -> float:
 
     return 3.14 - 6.28 + result + z * 2
 ```
+
+(what_is_a_rule=)
 
 ### "contract" + "transformation" = "rule"
 

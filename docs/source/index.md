@@ -3,14 +3,32 @@
 :maxdepth: 1
 
 installation
-tutorial
+```
+
+```{toctree}
+:hidden:
+:caption: Tutorials
+:maxdepth: 1
+
+tutorials/exploring-rules
+tutorials/programmatic-api
+```
+
+```{toctree}
+:hidden:
+:caption: Reference
+
+glossary
+api-reference
+```
+
+```{toctree}
+:hidden:
+:caption: Project
 
 faq
 changelog
 contributing
-
-glossary
-api-reference
 ```
 
 (what_is_refactor)=

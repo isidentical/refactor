@@ -26,4 +26,4 @@ $ pip install git+https://github.com/isidentical/refactor
 We only support Python 3.9 and higher.
 ```
 
-Once you have an environment ready, you can start exploring refactor with following [our tutorial](tutorial.md).
+Once you have an environment ready, you can start exploring refactor with following [our tutorial](tutorials/exploring-rules.md).
