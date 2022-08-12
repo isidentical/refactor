@@ -22,6 +22,7 @@ if TYPE_CHECKING:
     from refactor.context import Context
 
 C = TypeVar("C")
+PositionType = Tuple[int, int, int, int]
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
@@ -200,12 +201,12 @@ def has_positions(node_type: Type[ast.AST]) -> bool:
     return _POSITIONAL_ATTRIBUTES_SET.issubset(node_type._attributes)
 
 
-def position_for(node: ast.AST) -> Tuple[int, int, int, int]:
+def position_for(node: ast.AST) -> PositionType:
     """Return a 4-item tuple of positions for the given ``node``."""
     positions = tuple(
         getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES
     )
-    return cast(Tuple[int, int, int, int], positions)
+    return cast(PositionType, positions)
 
 
 def unpack_lhs(node: ast.AST) -> Iterator[str]:
