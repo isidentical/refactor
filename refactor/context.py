@@ -79,6 +79,9 @@ class Context:
     config: Configuration = field(default_factory=Configuration)
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
+    ancestry: Ancestry = field(init=False)
+    scope: Scope = field(init=False)
+
     @classmethod
     def _from_dependencies(
         cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
@@ -193,7 +196,7 @@ class Ancestry(Representative):
     def _ensure_annotated(self) -> None:
         self._annotate(self.context.tree)
 
-    def infer(self, node: ast.AST) -> Tuple[str, ast.AST]:
+    def infer(self, node: ast.AST) -> Tuple[Optional[str], Optional[ast.AST]]:
         """Return the given `node`'s parent field (the field
         name in parent which this node is stored in) and the
         parent."""
@@ -208,7 +211,7 @@ class Ancestry(Representative):
             if parent is None:
                 break
 
-            yield field, parent
+            yield cast(str, field), cast(ast.AST, parent)
             cursor = parent
 
     def get_parent(self, node: ast.AST) -> Optional[ast.AST]:

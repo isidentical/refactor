@@ -222,6 +222,10 @@ def next_statement_of(node: ast.stmt, context: Context) -> Optional[ast.stmt]:
     """Get the statement that follows ``node`` in the same syntactical block.
     """
     parent_field, parent = context.ancestry.infer(node)
+    if not parent_field is not None:
+        raise ValueError("condition failed: parent_field is not None")
+    if not parent is not None:
+        raise ValueError("condition failed: parent is not None")
     parent_field_val = getattr(parent, parent_field)
     if not isinstance(parent_field_val, list):
         return None
