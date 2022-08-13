@@ -36,6 +36,7 @@ repos:
          args:
          -   --disallow-incomplete-defs
          -   --ignore-missing-imports
+         -   --no-warn-no-return
          -   --disable-error-code
          -   attr-defined
 -   repo: https://github.com/hakancelikdev/unimport
