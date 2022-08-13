@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
-from refactor.common import _hint, find_indent
+from refactor.common import PositionType, _hint, find_indent, position_for
 from refactor.context import Context
 
 K = TypeVar("K")
@@ -73,21 +73,31 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
-        view = slice(self.node.lineno - 1, self.node.end_lineno)
+        (
+            lineno,
+            col_offset,
+            end_lineno,
+            end_col_offset,
+        ) = self._get_target_span(context, source)
 
+        view = slice(lineno - 1, end_lineno)
         target_lines = lines[view]
-        indentation, start_prefix = find_indent(
-            target_lines[0][: self.node.col_offset]
-        )
-        end_prefix = target_lines[-1][self.node.end_col_offset :]
+        indentation, start_prefix = find_indent(target_lines[0][:col_offset])
+        end_suffix = target_lines[-1][end_col_offset:]
 
-        replacement = split_lines(context.unparse(self.build()))
+        replacement = split_lines(self._resynthesize(context, source))
         replacement.apply_indentation(
-            indentation, start_prefix=start_prefix, end_suffix=end_prefix
+            indentation, start_prefix=start_prefix, end_suffix=end_suffix
         )
 
         lines[view] = replacement
         return lines.join()
+
+    def _get_target_span(self, context: Context, source: str) -> PositionType:
+        return position_for(self.node)
+
+    def _resynthesize(self, context: Context, source: str) -> str:
+        return context.unparse(self.build())
 
 
 @dataclass

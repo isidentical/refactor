@@ -53,7 +53,7 @@ def infer_definition_name(
     identifier_field: str,
     context: Context,
 ) -> Optional[common.PositionType]:
-    lines = split_lines(context.source)[node.lineno : node.end_lineno]
+    lines = split_lines(context.source)[node.lineno - 1 : node.end_lineno]
     tokens = _ignore_whitespace(tokenize.generate_tokens(_line_wrapper(lines)))
 
     def _next_token(
