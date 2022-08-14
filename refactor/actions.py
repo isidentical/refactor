@@ -78,14 +78,14 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
             col_offset,
             end_lineno,
             end_col_offset,
-        ) = self._get_target_span(context, source)
+        ) = self._get_target_span(context)
 
         view = slice(lineno - 1, end_lineno)
         target_lines = lines[view]
         indentation, start_prefix = find_indent(target_lines[0][:col_offset])
         end_suffix = target_lines[-1][end_col_offset:]
 
-        replacement = split_lines(self._resynthesize(context, source))
+        replacement = split_lines(self._resynthesize(context))
         replacement.apply_indentation(
             indentation, start_prefix=start_prefix, end_suffix=end_suffix
         )
@@ -93,10 +93,10 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
         lines[view] = replacement
         return lines.join()
 
-    def _get_target_span(self, context: Context, source: str) -> PositionType:
+    def _get_target_span(self, context: Context) -> PositionType:
         return position_for(self.node)
 
-    def _resynthesize(self, context: Context, source: str) -> str:
+    def _resynthesize(self, context: Context) -> str:
         return context.unparse(self.build())
 
 
@@ -178,3 +178,15 @@ class InsertAfter(LazyInsertAfter):
 @dataclass
 class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
     ...
+
+
+@dataclass
+class _Rename(LazyReplace):
+    new_name: str
+    _identifier_position: PositionType
+
+    def _get_target_span(self, context: Context) -> PositionType:
+        return self._identifier_position
+
+    def _resynthesize(self, context: Context) -> str:
+        return self.new_name
