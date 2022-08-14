@@ -60,15 +60,24 @@ def infer_definition_name(
         expected_type: int, expected_str: str
     ) -> Optional[tokenize.TokenInfo]:
         if (
-            next_token := next(tokens, None)  # type: ignore
+            (next_token := next(tokens, None))  # type: ignore
             and next_token.exact_type == expected_type  # type: ignore
             and next_token.string == expected_str  # type: ignore
         ):
             return next_token
 
-    for name in chain(EXPECTED_KEYWORDS[type(node)], node.name):
+    next_token = None
+    for name in chain(EXPECTED_KEYWORDS[type(node)], [node.name]):
         next_token = _next_token(tokenize.NAME, name)
         if next_token is None:
             return None
-    else:
-        return (*next_token.start, *next_token.end)  # type: ignore
+
+    assert next_token is not None
+    lineno, col_offset = next_token.start
+    end_lineno, end_col_offset = next_token.end
+    return (
+        node.lineno + lineno - 1,
+        col_offset,
+        node.lineno + end_lineno - 1,
+        end_col_offset,
+    )

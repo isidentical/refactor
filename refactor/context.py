@@ -352,6 +352,11 @@ class Scope(Representative):
 
     context_providers = (Ancestry,)
 
+    @cached_property
+    def global_scope(self) -> ScopeInfo:
+        """Return the global scope for the current module."""
+        return ScopeInfo(self.context.tree, ScopeType.GLOBAL, None)
+
     def resolve(self, node: ast.AST) -> ScopeInfo:
         """Return the scope record of the given `node`."""
         if isinstance(node, ast.Module):

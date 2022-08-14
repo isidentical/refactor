@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import ast
-import copy
 import warnings
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
-from refactor.common import PositionType, _hint, find_indent, position_for
+from refactor.common import (
+    PositionType,
+    _hint,
+    clone,
+    find_indent,
+    position_for,
+)
 from refactor.context import Context
 
 K = TypeVar("K")
@@ -56,7 +61,7 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
 
     def branch(self) -> K:
         """Return a full copy of the original node."""
-        return copy.deepcopy(self.node)
+        return clone(self.node)
 
 
 @_hint("deprecated_alias", "Action")
@@ -78,7 +83,7 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
             col_offset,
             end_lineno,
             end_col_offset,
-        ) = self._get_target_span(context)
+        ) = self._get_node_span(context)
 
         view = slice(lineno - 1, end_lineno)
         target_lines = lines[view]
@@ -93,7 +98,7 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
         lines[view] = replacement
         return lines.join()
 
-    def _get_target_span(self, context: Context) -> PositionType:
+    def _get_node_span(self, context: Context) -> PositionType:
         return position_for(self.node)
 
     def _resynthesize(self, context: Context) -> str:
@@ -181,12 +186,11 @@ class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
 
 
 @dataclass
-class _Rename(LazyReplace):
-    new_name: str
-    _identifier_position: PositionType
+class _Rename(Replace):
+    identifier_span: PositionType
 
-    def _get_target_span(self, context: Context) -> PositionType:
-        return self._identifier_position
+    def _get_node_span(self, context: Context) -> PositionType:
+        return self.identifier_span
 
     def _resynthesize(self, context: Context) -> str:
-        return self.new_name
+        return self.target.name

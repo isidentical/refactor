@@ -35,8 +35,8 @@ class ChangeType(Enum):
 @dataclass
 class ChangeSet:
     change_type: ChangeType
-    original_value: Any
-    new_value: Any
+    original_node: Any
+    new_node: Any
     on_field: Optional[str] = None
     on_index: Optional[int] = None
 
@@ -82,8 +82,8 @@ def ast_delta(baseline: ast.AST, new_node: ast.AST) -> Iterator[ChangeSet]:
 
             _field_change_if = partial(
                 _change_if,
-                original_value=baseline,
-                new_value=new_node,
+                original_node=baseline,
+                new_node=new_node,
                 on_field=field,
             )
 
@@ -129,8 +129,8 @@ def _ast_sequence_delta(
     ):
         _item_change_if = partial(
             _change_if,
-            original_value=baseline,
-            new_value=new_node,
+            original_node=baseline,
+            new_node=new_node,
             on_field=field,
             on_index=index,
         )

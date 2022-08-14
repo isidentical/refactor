@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 from collections import deque
 from functools import cache, singledispatch, wraps
 from typing import (
@@ -21,8 +22,14 @@ from typing import (
 if TYPE_CHECKING:
     from refactor.context import Context
 
+T = TypeVar("T")
 C = TypeVar("C")
 PositionType = Tuple[int, int, int, int]
+
+
+def clone(node: T) -> T:
+    """Clone the given ``node``."""
+    return copy.deepcopy(node)
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
