@@ -5,7 +5,11 @@ from typing import Callable, List, Optional
 from refactor import common
 from refactor.actions import BaseAction, Replace, _Rename
 from refactor.context import Context
-from refactor.internal.ast_delta import ChangeType, ast_delta
+from refactor.internal.ast_delta import (
+    ChangeType,
+    IncompleteASTError,
+    ast_delta,
+)
 from refactor.internal.position_provider import infer_identifier_position
 
 OptimizerType = Callable[[BaseAction, Context], Optional[BaseAction]]
@@ -33,6 +37,7 @@ def optimize(action: BaseAction, context: Context) -> BaseAction:
 
 
 @register_optimizer
+@common._guarded(IncompleteASTError)
 def replace_optimizer(
     action: BaseAction, context: Context
 ) -> Optional[BaseAction]:
@@ -45,9 +50,7 @@ def replace_optimizer(
     # advances one more, we'll give up.
     assert not next(change_provider, None)
 
-    if change.change_type is ChangeType.FULL:
-        return Replace(change.original_node, change.new_node)
-    elif change.change_type is ChangeType.FIELD_VALUE:
+    if change.change_type is ChangeType.FIELD_VALUE:
         # We only support renaming of definitions for now,
         # since they are the most needed case.
         if is_named_node(change.original_node) and change.on_field == "name":
