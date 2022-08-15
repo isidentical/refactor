@@ -18,14 +18,22 @@ def _line_wrapper(lines: Lines) -> Callable[[], str]:
     return read_line
 
 
-_WS_TOKENS = frozenset((tokenize.NL, tokenize.NEWLINE, tokenize.COMMENT))
+_SPACE_TOKENS = frozenset(
+    (
+        tokenize.NL,
+        tokenize.NEWLINE,
+        tokenize.COMMENT,
+        tokenize.INDENT,
+        tokenize.DEDENT,
+    )
+)
 
 
-def _ignore_whitespace(
+def _ignore_space(
     token_iterator: Iterator[tokenize.TokenInfo],
 ) -> Iterator[tokenize.TokenInfo]:
     for token in token_iterator:
-        if token.type not in _WS_TOKENS:
+        if token.type not in _SPACE_TOKENS:
             yield token
 
 
@@ -54,7 +62,7 @@ def infer_definition_name(
     context: Context,
 ) -> Optional[common.PositionType]:
     lines = split_lines(context.source)[node.lineno - 1 : node.end_lineno]
-    tokens = _ignore_whitespace(tokenize.generate_tokens(_line_wrapper(lines)))
+    tokens = _ignore_space(tokenize.generate_tokens(_line_wrapper(lines)))
 
     def _next_token(
         expected_type: int, expected_str: str
