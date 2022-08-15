@@ -1,10 +1,10 @@
 import ast
-import copy
 import re
 import textwrap
 
 import pytest
 
+from refactor import common
 from refactor.actions import InsertAfter, LazyReplace, Replace
 from refactor.change import Change
 from refactor.context import Configuration, Context, Representative
@@ -251,7 +251,7 @@ class ChangeSign(Rule):
     def match(self, node):
         assert isinstance(node, ast.BinOp)
 
-        new_node = copy.deepcopy(node)
+        new_node = common.clone(node)
         if isinstance(node.op, ast.Add):
             new_node.op = ast.Sub()
         elif isinstance(node.op, ast.Sub):
