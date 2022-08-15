@@ -1,8 +1,12 @@
 import ast
+from pathlib import Path
 
 import pytest
 
+import refactor
 from refactor.internal.ast_delta import ChangeSet, ChangeType, ast_delta
+
+SOURCE_DIR = Path(refactor.__file__).parent
 
 TREE_1 = ast.parse(
     """\
@@ -335,3 +339,12 @@ def test_sequence_str(pack):
             on_index=4,
         ),
     ]
+
+
+def test_no_delta():
+    for file in SOURCE_DIR.rglob("*.py"):
+        baseline = ast.parse(file.read_text())
+        new = ast.parse(file.read_text())
+        changes = list(ast_delta(baseline, new))
+        if len(changes) > 0:
+            pytest.fail(f"ast_delta failed on {file!s}")
