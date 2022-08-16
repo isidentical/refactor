@@ -1,5 +1,4 @@
 import ast
-import copy
 
 from refactor import Rule, common, run
 from refactor.actions import BaseAction, InsertAfter, Replace
@@ -44,14 +43,14 @@ class RenameDeprecatedAliases(Rule):
     def _rename_name(self, node: ast.Name) -> Replace:
         assert node.id in ACTION_ALIAS_MAPPING
 
-        replacement_node = copy.deepcopy(node)
+        replacement_node = common.clone(node)
         replacement_node.id = self._alias_for(node, node.id)
         return Replace(node, replacement_node)
 
     def _rename_attr(self, node: ast.Attribute) -> Replace:
         assert node.attr in ACTION_ALIAS_MAPPING
 
-        replacement_node = copy.deepcopy(node)
+        replacement_node = common.clone(node)
         replacement_node.attr = self._alias_for(node, node.attr)
 
         # Action imports from refactor.core now becomes refactor.actions

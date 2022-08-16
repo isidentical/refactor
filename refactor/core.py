@@ -24,6 +24,7 @@ from refactor.context import (
     Representative,
     _resolve_dependencies,
 )
+from refactor.internal.action_optimizer import optimize
 
 
 @dataclass
@@ -97,6 +98,7 @@ class Session:
             for rule in rules:
                 with suppress(AssertionError):
                     if action := rule.match(node):
+                        action = optimize(action, rule.context)
                         new_source = action.apply(rule.context, source)
                         if new_source not in _known_sources:
                             return self._run(

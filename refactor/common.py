@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import ast
+import copy
 from collections import deque
 from functools import cache, singledispatch, wraps
 from typing import (
@@ -21,7 +22,14 @@ from typing import (
 if TYPE_CHECKING:
     from refactor.context import Context
 
+T = TypeVar("T")
 C = TypeVar("C")
+PositionType = Tuple[int, int, int, int]
+
+
+def clone(node: T) -> T:
+    """Clone the given ``node``."""
+    return copy.deepcopy(node)
 
 
 def negate(node: ast.expr) -> ast.UnaryOp:
@@ -107,16 +115,10 @@ def _guarded(exc_type: Type[BaseException], /, default: Any = None) -> Any:
     return outer
 
 
-@_guarded(Exception)
-def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
-    """Faster (and less-precise) implementation of
-    ast.get_source_segment"""
-
-    try:
-        start_line, start_col, end_line, end_col = position_for(node)
-    except AttributeError:
-        return None
-
+def _get_known_location_from_source(
+    source: str, location: PositionType
+) -> Optional[str]:
+    start_line, start_col, end_line, end_col = location
     # Python AST line numbers are 1-indexed
     start_line -= 1
     end_line -= 1
@@ -131,6 +133,19 @@ def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
     start, *middle, end = lines[start_line : end_line + 1]
     new_lines = (start[start_col:], *middle, end[:end_col])
     return "\n".join(new_lines)
+
+
+@_guarded(Exception)
+def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
+    """Faster (and less-precise) implementation of
+    ast.get_source_segment"""
+
+    try:
+        node_position = position_for(node)
+    except AttributeError:
+        return None
+    else:
+        return _get_known_location_from_source(source, node_position)
 
 
 def pascal_to_snake(name: str) -> str:
@@ -200,12 +215,12 @@ def has_positions(node_type: Type[ast.AST]) -> bool:
     return _POSITIONAL_ATTRIBUTES_SET.issubset(node_type._attributes)
 
 
-def position_for(node: ast.AST) -> Tuple[int, int, int, int]:
+def position_for(node: ast.AST) -> PositionType:
     """Return a 4-item tuple of positions for the given ``node``."""
     positions = tuple(
         getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES
     )
-    return cast(Tuple[int, int, int, int], positions)
+    return cast(PositionType, positions)
 
 
 def unpack_lhs(node: ast.AST) -> Iterator[str]:
@@ -221,6 +236,10 @@ def next_statement_of(node: ast.stmt, context: Context) -> Optional[ast.stmt]:
     """Get the statement that follows ``node`` in the same syntactical block.
     """
     parent_field, parent = context.ancestry.infer(node)
+    if not parent_field is not None:
+        raise ValueError("condition failed: parent_field is not None")
+    if not parent is not None:
+        raise ValueError("condition failed: parent is not None")
     parent_field_val = getattr(parent, parent_field)
     if not isinstance(parent_field_val, list):
         return None

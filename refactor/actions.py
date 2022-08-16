@@ -1,14 +1,19 @@
 from __future__ import annotations
 
 import ast
-import copy
 import warnings
 from contextlib import suppress
 from dataclasses import dataclass
 from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
-from refactor.common import _hint, find_indent
+from refactor.common import (
+    PositionType,
+    _hint,
+    clone,
+    find_indent,
+    position_for,
+)
 from refactor.context import Context
 
 K = TypeVar("K")
@@ -56,7 +61,7 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
 
     def branch(self) -> K:
         """Return a full copy of the original node."""
-        return copy.deepcopy(self.node)
+        return clone(self.node)
 
 
 @_hint("deprecated_alias", "Action")
@@ -73,21 +78,31 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
-        view = slice(self.node.lineno - 1, self.node.end_lineno)
+        (
+            lineno,
+            col_offset,
+            end_lineno,
+            end_col_offset,
+        ) = self._get_node_span(context)
 
+        view = slice(lineno - 1, end_lineno)
         target_lines = lines[view]
-        indentation, start_prefix = find_indent(
-            target_lines[0][: self.node.col_offset]
-        )
-        end_prefix = target_lines[-1][self.node.end_col_offset :]
+        indentation, start_prefix = find_indent(target_lines[0][:col_offset])
+        end_suffix = target_lines[-1][end_col_offset:]
 
-        replacement = split_lines(context.unparse(self.build()))
+        replacement = split_lines(self._resynthesize(context))
         replacement.apply_indentation(
-            indentation, start_prefix=start_prefix, end_suffix=end_prefix
+            indentation, start_prefix=start_prefix, end_suffix=end_suffix
         )
 
         lines[view] = replacement
         return lines.join()
+
+    def _get_node_span(self, context: Context) -> PositionType:
+        return position_for(self.node)
+
+    def _resynthesize(self, context: Context) -> str:
+        return context.unparse(self.build())
 
 
 @dataclass
@@ -168,3 +183,14 @@ class InsertAfter(LazyInsertAfter):
 @dataclass
 class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
     ...
+
+
+@dataclass
+class _Rename(Replace):
+    identifier_span: PositionType
+
+    def _get_node_span(self, context: Context) -> PositionType:
+        return self.identifier_span
+
+    def _resynthesize(self, context: Context) -> str:
+        return self.target.name

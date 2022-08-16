@@ -3,17 +3,17 @@ import textwrap
 import typing
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List
+from typing import List, Optional, Sequence
 
 import pytest
 
 import refactor
-from refactor import BaseAction, Session, common, context
+from refactor import BaseAction, Rule, Session, common, context
 from refactor.actions import Replace
-from refactor.context import Scope
+from refactor.context import Scope, ScopeType
 
 
-class ReplaceNexts(refactor.Rule):
+class ReplaceNexts(Rule):
     INPUT_SOURCE = """
     def solution(Nexter: inputs):
         # blahblah some code here and there
@@ -56,7 +56,7 @@ class ReplaceNexts(refactor.Rule):
         return Replace(node, target_func)
 
 
-class ReplacePlaceholders(refactor.Rule):
+class ReplacePlaceholders(Rule):
     INPUT_SOURCE = """
     def test():
         print(placeholder)
@@ -85,7 +85,7 @@ class ReplacePlaceholders(refactor.Rule):
         return refactor.Replace(node, replacement)
 
 
-class PropagateConstants(refactor.Rule):
+class PropagateConstants(Rule):
     INPUT_SOURCE = """
     a = 1
 
@@ -183,7 +183,7 @@ class ModifyExistingImport(refactor.LazyReplace):
         return new_node
 
 
-class TypingAutoImporter(refactor.Rule):
+class TypingAutoImporter(Rule):
     INPUT_SOURCE = """
     import lol
     from something import another
@@ -254,7 +254,7 @@ class AsyncifierAction(refactor.LazyReplace):
         return new_node
 
 
-class MakeFunctionAsync(refactor.Rule):
+class MakeFunctionAsync(Rule):
     INPUT_SOURCE = """
     def something():
         a += .1
@@ -290,7 +290,7 @@ class MakeFunctionAsync(refactor.Rule):
         return AsyncifierAction(node)
 
 
-class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
+class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
     context_providers = (context.Scope,)
 
     INPUT_SOURCE = """
@@ -311,7 +311,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
 
         """
 
-    def match(self, node: ast.AST) -> typing.Optional[BaseAction]:
+    def match(self, node: ast.AST) -> Optional[BaseAction]:
         assert isinstance(node, (ast.FunctionDef, ast.Lambda))
         assert any(kw_default is None for kw_default in node.args.kw_defaults)
 
@@ -350,6 +350,113 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         return Replace(node, target)
 
 
+class InternalizeFunctions(Rule):
+    INPUT_SOURCE = """
+        __all__ = ["regular"]
+        def regular():
+            pass
+
+        def foo():
+
+
+            return easy_to_fool_me
+
+        def               bar (                    ):
+                return maybe_indented
+
+        def        \
+            maybe \
+                (more):
+                    return complicated
+
+        if indented_1:
+            if indented_2:
+                def normal():
+                    return normal
+
+        @dataclass
+        class Zebra:
+            def does_not_matter():
+                pass
+
+        @deco
+        async \
+            def \
+                async_function():
+                    pass
+        """
+
+    EXPECTED_SOURCE = """
+        __all__ = ["regular"]
+        def regular():
+            pass
+
+        def _foo():
+
+
+            return easy_to_fool_me
+
+        def               _bar (                    ):
+                return maybe_indented
+
+        def        \
+            _maybe \
+                (more):
+                    return complicated
+
+        if indented_1:
+            if indented_2:
+                def _normal():
+                    return normal
+
+        @dataclass
+        class _Zebra:
+            def does_not_matter():
+                pass
+
+        @deco
+        async \
+            def \
+                _async_function():
+                    pass
+        """
+
+    def _get_public_functions(self) -> Optional[Sequence[str]]:
+        # __all__ generally contains only a list/tuple of strings
+        # so it should be easy to infer.
+
+        global_scope = self.context.scope.global_scope
+
+        try:
+            [raw_definition] = global_scope.get_definitions("__all__") or []
+        except ValueError:
+            return None
+
+        assert isinstance(raw_definition, ast.Assign)
+
+        try:
+            return ast.literal_eval(raw_definition.value)
+        except ValueError:
+            return None
+
+    def match(self, node: ast.AST) -> Replace:
+        assert isinstance(
+            node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)
+        )
+        assert not node.name.startswith("_")
+
+        node_scope = self.context.scope.resolve(node)
+        assert node_scope.scope_type is ScopeType.GLOBAL
+
+        public_functions = self._get_public_functions()
+        assert public_functions is not None
+        assert node.name not in public_functions
+
+        new_node = common.clone(node)
+        new_node.name = "_" + node.name
+        return Replace(node, new_node)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -359,6 +466,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(refactor.Rule):
         TypingAutoImporter,
         MakeFunctionAsync,
         OnlyKeywordArgumentDefaultNotSetCheckRule,
+        InternalizeFunctions,
     ],
 )
 def test_complete_rules(rule):
