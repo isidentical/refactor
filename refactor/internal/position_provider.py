@@ -70,7 +70,7 @@ def infer_definition_name(
 
     def _next_token() -> Optional[tokenize.TokenInfo]:
         try:
-            return next(tokens)
+            return next(tokens, None)
         except (SyntaxError, tokenize.TokenError):
             return None
 
