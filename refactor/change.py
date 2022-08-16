@@ -24,7 +24,7 @@ class Change:
         original_lines = split_lines(self.original_source)
         refactored_lines = split_lines(self.refactored_source)
 
-        return "\n".join(
+        return "".join(
             difflib.unified_diff(
                 original_lines,
                 refactored_lines,

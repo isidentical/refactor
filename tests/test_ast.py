@@ -20,12 +20,12 @@ def test_split_lines():
     )
 
     assert list(split_lines(source)) == [
-        "1 + 2",
-        "print(foo)",
-        "if not (",
-        "    bar",
-        "):",
-        "    print(z)",
+        "1 + 2\n",
+        "print(foo)\n",
+        "if not (\n",
+        "    bar\n",
+        "):\n",
+        "    print(z)\n",
     ]
 
 
@@ -42,6 +42,9 @@ def test_split_lines():
         "x\n\n",
         "x\n\n\n",
         "x\n\nxx\n\n",
+        "x\n\r\nxx\r\n\r\n",
+        "x\n\r\n\nx\r\n\r\n\r\n",
+        "x\n\r\n\nx\r\n\r\r",
     ],
 )
 def test_split_lines_variations(source):
