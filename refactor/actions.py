@@ -10,6 +10,7 @@ from refactor.ast import split_lines
 from refactor.common import (
     PositionType,
     _hint,
+    _is_critical_field,
     clone,
     find_indent,
     position_for,
@@ -26,6 +27,7 @@ __all__ = [
     "LazyInsertAfter",
     "LazyReplace",
     "Replace",
+    "Erase",
 ]
 
 
@@ -56,7 +58,7 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
     node: K
 
     def build(self) -> T:
-        """Create the replacement node."""
+        """Create the new node."""
         raise NotImplementedError
 
     def branch(self) -> K:
@@ -64,18 +66,7 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
         return clone(self.node)
 
 
-@_hint("deprecated_alias", "Action")
-@dataclass
-class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
-    """Transforms the code segment of the given `node` with
-    the re-synthesized version :py:meth:`LazyReplace.build`'s
-    output.
-
-    .. note::
-        Subclasses of :py:class:`LazyReplace` must override
-        :py:meth:`LazyReplace.build`.
-    """
-
+class _ReplaceCodeSegmentAction(BaseAction):
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
         (
@@ -83,7 +74,7 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
             col_offset,
             end_lineno,
             end_col_offset,
-        ) = self._get_node_span(context)
+        ) = self._get_segment_span(context)
 
         view = slice(lineno - 1, end_lineno)
         target_lines = lines[view]
@@ -98,7 +89,28 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
         lines[view] = replacement
         return lines.join()
 
-    def _get_node_span(self, context: Context) -> PositionType:
+    def _get_segment_span(self, context: Context) -> PositionType:
+        raise NotImplementedError
+
+    def _resynthesize(self, context: Context) -> str:
+        raise NotImplementedError
+
+
+@_hint("deprecated_alias", "Action")
+@dataclass
+class LazyReplace(
+    _ReplaceCodeSegmentAction, _LazyActionMixin[ast.AST, ast.AST]
+):
+    """Transforms the code segment of the given `node` with
+    the re-synthesized version :py:meth:`LazyReplace.build`'s
+    output.
+
+    .. note::
+        Subclasses of :py:class:`LazyReplace` must override
+        :py:meth:`LazyReplace.build`.
+    """
+
+    def _get_segment_span(self, context: Context) -> PositionType:
         return position_for(self.node)
 
     def _resynthesize(self, context: Context) -> str:
@@ -189,8 +201,38 @@ class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
 class _Rename(Replace):
     identifier_span: PositionType
 
-    def _get_node_span(self, context: Context) -> PositionType:
+    def _get_segment_span(self, context: Context) -> PositionType:
         return self.identifier_span
 
     def _resynthesize(self, context: Context) -> str:
         return self.target.name
+
+
+@dataclass
+class Erase(_ReplaceCodeSegmentAction):
+    node: ast.stmt
+    _padding_value: str = "pass"
+
+    def _get_segment_span(self, context: Context) -> PositionType:
+        return position_for(self.node)
+
+    def _is_auto_padding_required(self, context: Context) -> bool:
+        parent_field, parent_node = context.ancestry.infer(self.node)
+        if parent_field is None or parent_node is None:
+            if isinstance(self.node, ast.Module):
+                raise ValueError("Can't erase ast.Module")
+            else:
+                raise RuntimeError("Couldn't find the parent of {self.node}.")
+
+        parent_field_value = getattr(parent_node, parent_field)
+        return (
+            isinstance(parent_field_value, list)
+            and len(parent_field_value) == 1
+            and _is_critical_field(type(parent_node), parent_field)
+        )
+
+    def _resynthesize(self, context: Context) -> str:
+        if self._is_auto_padding_required(context):
+            return self._padding_value
+        else:
+            return ""

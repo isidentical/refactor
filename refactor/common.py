@@ -348,3 +348,9 @@ def _hint(handler: str, *args: Any, **kwargs: Any) -> Callable[[C], C]:
         return obj
 
     return wrapper
+
+
+def _is_critical_field(node_type: Type[ast.AST], field: str) -> bool:
+    """Returns whether the given ``field`` of the given ``node_type`` is required
+    to have at least one children value."""
+    return issubclass(node_type, ast.stmt) and field == "body"
