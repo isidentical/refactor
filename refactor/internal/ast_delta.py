@@ -140,7 +140,6 @@ def _ast_sequence_delta(
                     yield from _item_change_if(
                         new_item is not base_item, ChangeType.FULL
                     )
-                    continue
                 else:
                     _incomplete_if(not isinstance(new_item, ast.AST))
                     yield from ast_delta(base_item, new_item)

@@ -379,6 +379,7 @@ class InternalizeFunctions(Rule):
             def does_not_matter():
                 pass
 
+        @deco
         async \
             def \
                 async_function():
