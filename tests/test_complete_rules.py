@@ -373,6 +373,16 @@ class InternalizeFunctions(Rule):
             if indented_2:
                 def normal():
                     return normal
+
+        @dataclass
+        class Zebra:
+            def does_not_matter():
+                pass
+
+        async \
+            def \
+                async_function():
+                    pass
         """
 
     EXPECTED_SOURCE = """
@@ -397,6 +407,17 @@ class InternalizeFunctions(Rule):
             if indented_2:
                 def _normal():
                     return normal
+
+        @dataclass
+        class _Zebra:
+            def does_not_matter():
+                pass
+
+        @deco
+        async \
+            def \
+                _async_function():
+                    pass
         """
 
     def _get_public_functions(self) -> Optional[Sequence[str]]:
@@ -418,7 +439,9 @@ class InternalizeFunctions(Rule):
             return None
 
     def match(self, node: ast.AST) -> Replace:
-        assert isinstance(node, ast.FunctionDef)
+        assert isinstance(
+            node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)
+        )
         assert not node.name.startswith("_")
 
         node_scope = self.context.scope.resolve(node)
