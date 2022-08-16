@@ -115,16 +115,10 @@ def _guarded(exc_type: Type[BaseException], /, default: Any = None) -> Any:
     return outer
 
 
-@_guarded(Exception)
-def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
-    """Faster (and less-precise) implementation of
-    ast.get_source_segment"""
-
-    try:
-        start_line, start_col, end_line, end_col = position_for(node)
-    except AttributeError:
-        return None
-
+def _get_known_location_from_source(
+    source: str, location: PositionType
+) -> Optional[str]:
+    start_line, start_col, end_line, end_col = location
     # Python AST line numbers are 1-indexed
     start_line -= 1
     end_line -= 1
@@ -139,6 +133,19 @@ def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
     start, *middle, end = lines[start_line : end_line + 1]
     new_lines = (start[start_col:], *middle, end[:end_col])
     return "\n".join(new_lines)
+
+
+@_guarded(Exception)
+def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
+    """Faster (and less-precise) implementation of
+    ast.get_source_segment"""
+
+    try:
+        node_position = position_for(node)
+    except AttributeError:
+        return None
+    else:
+        return _get_known_location_from_source(source, node_position)
 
 
 def pascal_to_snake(name: str) -> str:

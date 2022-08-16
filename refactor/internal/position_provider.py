@@ -40,7 +40,7 @@ def _ignore_space(
 @singledispatch
 def infer_identifier_position(
     node: ast.AST,
-    identifier_field: str,
+    identifier_value: str,
     context: Context,
 ) -> Optional[common.PositionType]:
     ...
@@ -58,34 +58,45 @@ EXPECTED_KEYWORDS = {
 @infer_identifier_position.register(ast.AsyncFunctionDef)
 def infer_definition_name(
     node: Union[ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef],
-    identifier_field: str,
+    identifier_value: str,
     context: Context,
 ) -> Optional[common.PositionType]:
-    lines = split_lines(context.source)[node.lineno - 1 : node.end_lineno]
+    source_segment = common.get_source_segment(context.source, node)
+    if source_segment is None:
+        return None
+
+    lines = split_lines(source_segment)
     tokens = _ignore_space(tokenize.generate_tokens(_line_wrapper(lines)))
 
-    def _next_token(
+    def _next_token() -> Optional[tokenize.TokenInfo]:
+        try:
+            return next(tokens)
+        except (SyntaxError, tokenize.TokenError):
+            return None
+
+    def _expect_token(
         expected_type: int, expected_str: str
     ) -> Optional[tokenize.TokenInfo]:
         if (
-            (next_token := next(tokens, None))  # type: ignore
-            and next_token.exact_type == expected_type  # type: ignore
-            and next_token.string == expected_str  # type: ignore
+            (next_token := _next_token())
+            and next_token.exact_type == expected_type
+            and next_token.string == expected_str
         ):
             return next_token
 
     next_token = None
-    for name in chain(EXPECTED_KEYWORDS[type(node)], [node.name]):
-        next_token = _next_token(tokenize.NAME, name)
+    for name in chain(EXPECTED_KEYWORDS[type(node)], [identifier_value]):
+        next_token = _expect_token(tokenize.NAME, name)
         if next_token is None:
             return None
 
     assert next_token is not None
     lineno, col_offset = next_token.start
     end_lineno, end_col_offset = next_token.end
+    start_line, start_col = node.lineno - 1, node.col_offset
     return (
-        node.lineno + lineno - 1,
-        col_offset,
-        node.lineno + end_lineno - 1,
-        end_col_offset,
+        start_line + lineno,
+        start_col + col_offset,
+        start_line + end_lineno,
+        start_col + end_col_offset,
     )
