@@ -212,29 +212,39 @@ class _Rename(Replace):
         return self.target.name
 
 
-def is_critical_node(context: Context, node: ast.stmt) -> bool:
-    parent_field, parent_node = context.ancestry.infer(node)
-    if parent_field is None or parent_node is None:
-        if isinstance(node, ast.Module):
-            raise ValueError("Can't erase ast.Module")
-        else:
-            raise RuntimeError(f"Couldn't find the parent of {node}.")
-
-    parent_field_value = getattr(parent_node, parent_field)
-    return (
-        isinstance(parent_field_value, list) and len(parent_field_value) == 1
-    )
-
-
 @dataclass
 class Erase(_ReplaceCodeSegmentAction):
+    """Erases the given `node` statement from source code. Be careful when
+    using this action, as it can't remove required statements (e.g. if the `node`
+    is the only child statement of the parent node).
+
+    .. note::
+        If you want to quickly get rid of a statement without doing your own analysis
+        first (in order to determine whether it is required or not), you can use the
+        :py:class:`EraseOrReplace`.
+    """
+
     node: ast.stmt
+
+    def is_critical_node(self, context: Context) -> bool:
+        parent_field, parent_node = context.ancestry.infer(self.node)
+        if parent_field is None or parent_node is None:
+            if isinstance(self.node, ast.Module):
+                raise ValueError("Can't erase ast.Module")
+            else:
+                raise RuntimeError(f"Couldn't find the parent of {self.node}.")
+
+        parent_field_value = getattr(parent_node, parent_field)
+        return (
+            isinstance(parent_field_value, list)
+            and len(parent_field_value) == 1
+        )
 
     def _get_segment_span(self, context: Context) -> PositionType:
         return position_for(self.node)
 
     def _resynthesize(self, context: Context) -> str:
-        if is_critical_node(context, self.node):
+        if self.is_critical_node(context):
             raise InvalidActionError(
                 "Erasing the following statement will end up with an empty"
                 " block. Consider using the erase_or_replace function"
@@ -247,7 +257,7 @@ class Erase(_ReplaceCodeSegmentAction):
 
 @dataclass
 class EraseOrReplace(Erase):
-    """Erases the given statement if it is not required (e.g. if it is not the
+    """Erases the given `node` statement if it is not required (e.g. if it is not the
     only child statement of the parent node). Otherwise replaces it with the re-synthesized
     version of the given `target` statement (by default, it is ``pass``).
     """
@@ -255,7 +265,7 @@ class EraseOrReplace(Erase):
     target: ast.stmt = field(default_factory=ast.Pass)
 
     def _resynthesize(self, context: Context) -> str:
-        if is_critical_node(context, self.node):
+        if self.is_critical_node(context):
             return context.unparse(self.target)
         else:
             return ""
