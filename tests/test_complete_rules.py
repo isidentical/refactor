@@ -7,10 +7,14 @@ from typing import List, Optional, Sequence
 
 import pytest
 
-import refactor
 from refactor import BaseAction, Rule, Session, common, context
-from refactor.actions import Replace
-from refactor.context import Scope, ScopeType
+from refactor.actions import (
+    EraseOrReplace,
+    LazyInsertAfter,
+    LazyReplace,
+    Replace,
+)
+from refactor.context import Representative, Scope, ScopeType
 
 
 class ReplaceNexts(Rule):
@@ -82,7 +86,7 @@ class ReplacePlaceholders(Rule):
         assert node.id == "placeholder"
 
         replacement = ast.Constant(42)
-        return refactor.Replace(node, replacement)
+        return Replace(node, replacement)
 
 
 class PropagateConstants(Rule):
@@ -139,10 +143,10 @@ class PropagateConstants(Rule):
         assert isinstance(definition := definitions[0], ast.Assign)
         assert isinstance(value := definition.value, ast.Constant)
 
-        return refactor.Replace(node, value)
+        return Replace(node, value)
 
 
-class ImportFinder(refactor.Representative):
+class ImportFinder(Representative):
     def collect(self, name, scope):
         import_statents = [
             node
@@ -161,7 +165,7 @@ class ImportFinder(refactor.Representative):
 
 
 @dataclass
-class AddNewImport(refactor.LazyInsertAfter):
+class AddNewImport(LazyInsertAfter):
     module: str
     names: List[str]
 
@@ -174,7 +178,7 @@ class AddNewImport(refactor.LazyInsertAfter):
 
 
 @dataclass
-class ModifyExistingImport(refactor.LazyReplace):
+class ModifyExistingImport(LazyReplace):
     name: str
 
     def build(self):
@@ -247,7 +251,7 @@ class TypingAutoImporter(Rule):
         return ModifyExistingImport(closest_import, node.id)
 
 
-class AsyncifierAction(refactor.LazyReplace):
+class AsyncifierAction(LazyReplace):
     def build(self):
         new_node = self.branch()
         new_node.__class__ = ast.AsyncFunctionDef
@@ -457,6 +461,129 @@ class InternalizeFunctions(Rule):
         return Replace(node, new_node)
 
 
+class RemoveDeadCode(Rule):
+    INPUT_SOURCE = """
+    CONSTANT_1 = True
+    CONSTANT_2 = False
+    CONSTANT_3 = 1
+    CONSTANT_4 = 0
+    CONSTANT_5 = uninferrable()
+    if CONSTANT_1:
+        pass
+    if CONSTANT_2:
+        pass
+    if CONSTANT_3:
+        pass
+    if CONSTANT_4:
+        pass
+    if CONSTANT_5:
+        pass
+    def f():
+        if CONSTANT_1:
+            pass
+    def f():
+        if CONSTANT_1:
+            if CONSTANT_2:
+                if CONSTANT_3:
+                    pass
+    def f():
+        if CONSTANT_1:
+            pass
+        if CONSTANT_2:
+            pass
+    def f3():
+        if CONSTANT_2:
+            pass
+        return
+    def f4():
+        try:
+            if CONSTANT_2:
+                pass
+        except Exception:
+            z = 4
+            if CONSTANT_2:
+                pass
+        finally:
+            if CONSTANT_4:
+                pass
+    for function in f():
+        if CONSTANT_5:
+            pass
+    else:
+        if CONSTANT_2:
+            pass
+    for function in f():
+        if CONSTANT_2:
+            pass
+        a = 1
+    else:
+        b = 2
+        if CONSTANT_2:
+            pass
+    """
+
+    EXPECTED_SOURCE = """
+        CONSTANT_1 = True
+        CONSTANT_2 = False
+        CONSTANT_3 = 1
+        CONSTANT_4 = 0
+        CONSTANT_5 = uninferrable()
+        if CONSTANT_1:
+            pass
+        if CONSTANT_3:
+            pass
+        if CONSTANT_5:
+            pass
+        def f():
+            if CONSTANT_1:
+                pass
+        def f():
+            if CONSTANT_1:
+                pass
+        def f():
+            if CONSTANT_1:
+                pass
+        def f3():
+            return
+        def f4():
+            try:
+                pass
+            except Exception:
+                z = 4
+            finally:
+                pass
+        for function in f():
+            if CONSTANT_5:
+                pass
+        else:
+            pass
+        for function in f():
+            a = 1
+        else:
+            b = 2
+    """
+
+    def match(self, node: ast.AST) -> Optional[EraseOrReplace]:
+        assert isinstance(node, ast.If)
+
+        if isinstance(node.test, ast.Constant):
+            static_condition = node.test.value
+        elif isinstance(node.test, ast.Name):
+            node_scope = self.context.scope.resolve(node)
+            definitions = node_scope.get_definitions(node.test.id) or []
+            assert len(definitions) == 1 and isinstance(
+                definition := definitions[0], ast.Assign
+            )
+            assert isinstance(definition.value, ast.Constant)
+            static_condition = definition.value
+        else:
+            return None
+
+        assert not static_condition.value
+        assert not node.orelse
+        return EraseOrReplace(node)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -467,6 +594,7 @@ class InternalizeFunctions(Rule):
         MakeFunctionAsync,
         OnlyKeywordArgumentDefaultNotSetCheckRule,
         InternalizeFunctions,
+        RemoveDeadCode,
     ],
 )
 def test_complete_rules(rule):

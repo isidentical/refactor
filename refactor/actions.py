@@ -3,14 +3,13 @@ from __future__ import annotations
 import ast
 import warnings
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
 from refactor.common import (
     PositionType,
     _hint,
-    _is_critical_field,
     clone,
     find_indent,
     position_for,
@@ -28,7 +27,12 @@ __all__ = [
     "LazyReplace",
     "Replace",
     "Erase",
+    "EraseOrReplace",
 ]
+
+
+class InvalidActionError(ValueError):
+    pass
 
 
 class BaseAction:
@@ -208,31 +212,50 @@ class _Rename(Replace):
         return self.target.name
 
 
+def is_critical_node(context: Context, node: ast.stmt) -> bool:
+    parent_field, parent_node = context.ancestry.infer(node)
+    if parent_field is None or parent_node is None:
+        if isinstance(node, ast.Module):
+            raise ValueError("Can't erase ast.Module")
+        else:
+            raise RuntimeError(f"Couldn't find the parent of {node}.")
+
+    parent_field_value = getattr(parent_node, parent_field)
+    return (
+        isinstance(parent_field_value, list) and len(parent_field_value) == 1
+    )
+
+
 @dataclass
 class Erase(_ReplaceCodeSegmentAction):
     node: ast.stmt
-    _padding_value: str = "pass"
 
     def _get_segment_span(self, context: Context) -> PositionType:
         return position_for(self.node)
 
-    def _is_auto_padding_required(self, context: Context) -> bool:
-        parent_field, parent_node = context.ancestry.infer(self.node)
-        if parent_field is None or parent_node is None:
-            if isinstance(self.node, ast.Module):
-                raise ValueError("Can't erase ast.Module")
-            else:
-                raise RuntimeError("Couldn't find the parent of {self.node}.")
+    def _resynthesize(self, context: Context) -> str:
+        if is_critical_node(context, self.node):
+            raise InvalidActionError(
+                "Erasing the following statement will end up with an empty"
+                " block. Consider using the erase_or_replace function"
+                f" instead.\nTarget node: {self.node} @"
+                f" {context.file or '<string>'}:{self.node.lineno}"
+            )
+        else:
+            return ""
 
-        parent_field_value = getattr(parent_node, parent_field)
-        return (
-            isinstance(parent_field_value, list)
-            and len(parent_field_value) == 1
-            and _is_critical_field(type(parent_node), parent_field)
-        )
+
+@dataclass
+class EraseOrReplace(Erase):
+    """Erases the given statement if it is not required (e.g. if it is not the
+    only child statement of the parent node). Otherwise replaces it with the re-synthesized
+    version of the given `target` statement (by default, it is ``pass``).
+    """
+
+    target: ast.stmt = field(default_factory=ast.Pass)
 
     def _resynthesize(self, context: Context) -> str:
-        if self._is_auto_padding_required(context):
-            return self._padding_value
+        if is_critical_node(context, self.node):
+            return context.unparse(self.target)
         else:
             return ""
