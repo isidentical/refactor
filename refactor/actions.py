@@ -28,11 +28,12 @@ __all__ = [
     "Replace",
     "Erase",
     "EraseOrReplace",
+    "InvalidActionError",
 ]
 
 
 class InvalidActionError(ValueError):
-    pass
+    """An improper usage of an action."""
 
 
 class BaseAction:
