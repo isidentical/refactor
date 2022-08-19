@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import warnings
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
@@ -26,7 +26,14 @@ __all__ = [
     "LazyInsertAfter",
     "LazyReplace",
     "Replace",
+    "Erase",
+    "EraseOrReplace",
+    "InvalidActionError",
 ]
+
+
+class InvalidActionError(ValueError):
+    """An improper usage of an action."""
 
 
 class BaseAction:
@@ -56,7 +63,7 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
     node: K
 
     def build(self) -> T:
-        """Create the replacement node."""
+        """Create the new node."""
         raise NotImplementedError
 
     def branch(self) -> K:
@@ -64,18 +71,7 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
         return clone(self.node)
 
 
-@_hint("deprecated_alias", "Action")
-@dataclass
-class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
-    """Transforms the code segment of the given `node` with
-    the re-synthesized version :py:meth:`LazyReplace.build`'s
-    output.
-
-    .. note::
-        Subclasses of :py:class:`LazyReplace` must override
-        :py:meth:`LazyReplace.build`.
-    """
-
+class _ReplaceCodeSegmentAction(BaseAction):
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source)
         (
@@ -83,7 +79,7 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
             col_offset,
             end_lineno,
             end_col_offset,
-        ) = self._get_node_span(context)
+        ) = self._get_segment_span(context)
 
         view = slice(lineno - 1, end_lineno)
         target_lines = lines[view]
@@ -98,7 +94,28 @@ class LazyReplace(_LazyActionMixin[ast.AST, ast.AST]):
         lines[view] = replacement
         return lines.join()
 
-    def _get_node_span(self, context: Context) -> PositionType:
+    def _get_segment_span(self, context: Context) -> PositionType:
+        raise NotImplementedError
+
+    def _resynthesize(self, context: Context) -> str:
+        raise NotImplementedError
+
+
+@_hint("deprecated_alias", "Action")
+@dataclass
+class LazyReplace(
+    _ReplaceCodeSegmentAction, _LazyActionMixin[ast.AST, ast.AST]
+):
+    """Transforms the code segment of the given `node` with
+    the re-synthesized version :py:meth:`LazyReplace.build`'s
+    output.
+
+    .. note::
+        Subclasses of :py:class:`LazyReplace` must override
+        :py:meth:`LazyReplace.build`.
+    """
+
+    def _get_segment_span(self, context: Context) -> PositionType:
         return position_for(self.node)
 
     def _resynthesize(self, context: Context) -> str:
@@ -191,8 +208,67 @@ class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
 class _Rename(Replace):
     identifier_span: PositionType
 
-    def _get_node_span(self, context: Context) -> PositionType:
+    def _get_segment_span(self, context: Context) -> PositionType:
         return self.identifier_span
 
     def _resynthesize(self, context: Context) -> str:
         return self.target.name
+
+
+@dataclass
+class Erase(_ReplaceCodeSegmentAction):
+    """Erases the given `node` statement from source code. Be careful when
+    using this action, as it can't remove required statements (e.g. if the `node`
+    is the only child statement of the parent node).
+
+    .. note::
+        If you want to quickly get rid of a statement without doing your own analysis
+        first (in order to determine whether it is required or not), you can use the
+        :py:class:`EraseOrReplace`.
+    """
+
+    node: ast.stmt
+
+    def is_critical_node(self, context: Context) -> bool:
+        parent_field, parent_node = context.ancestry.infer(self.node)
+        if parent_field is None or parent_node is None:
+            if isinstance(self.node, ast.Module):
+                raise ValueError("Can't erase ast.Module")
+            else:
+                raise RuntimeError(f"Couldn't find the parent of {self.node}.")
+
+        parent_field_value = getattr(parent_node, parent_field)
+        return (
+            isinstance(parent_field_value, list)
+            and len(parent_field_value) == 1
+        )
+
+    def _get_segment_span(self, context: Context) -> PositionType:
+        return position_for(self.node)
+
+    def _resynthesize(self, context: Context) -> str:
+        if self.is_critical_node(context):
+            raise InvalidActionError(
+                "Erasing the following statement will end up with an empty"
+                " block. Consider using the erase_or_replace function"
+                f" instead.\nTarget node: {self.node} @"
+                f" {context.file or '<string>'}:{self.node.lineno}"
+            )
+        else:
+            return ""
+
+
+@dataclass
+class EraseOrReplace(Erase):
+    """Erases the given `node` statement if it is not required (e.g. if it is not the
+    only child statement of the parent node). Otherwise replaces it with the re-synthesized
+    version of the given `target` statement (by default, it is ``pass``).
+    """
+
+    target: ast.stmt = field(default_factory=ast.Pass)
+
+    def _resynthesize(self, context: Context) -> str:
+        if self.is_critical_node(context):
+            return context.unparse(self.target)
+        else:
+            return ""

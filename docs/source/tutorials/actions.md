@@ -166,6 +166,150 @@ do_something(result)
 :::
 ::::
 
+### Erase / EraseOrReplace
+
+If you are interested in erasing a statement completely out of the source code, you can use [`Erase`](refactor.actions.Erase)
+{term}`action`. It takes a statement, and if that statement's removal won't create any problems (e.g. removing the only child
+statement under a block, like in the **invalid** case below) it will remove it completely.
+
+```{code-block} python
+---
+emphasize-lines: 3, 8
+---
+import ast
+from refactor import Rule, Session
+from refactor.actions import Erase
+
+class EraseAsserts(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.Assert)
+        return Erase(node)
+```
+
+::::{tab-set}
+
+:::{tab-item} Valid Case
+
+```python
+def main(x, y):
+    assert x >= 5
+    if y <= 3:
+        y += 5
+        assert y > 3
+    assert x + y > 8
+    return x + y
+```
+
+```py
+def main(x, y):
+    if y <= 3:
+        y += 5
+    return x + y
+```
+
+:::
+
+:::{tab-item} Invalid Case
+
+```python
+def main(x, y):
+    if x is not None:
+        assert x >= 5
+    else:
+        x = 3
+    return x + y
+```
+
+Running the `EraseAsserts` rule on this case would result with an [`InvalidActionError`](refactor.actions.InvalidActionError)
+since the removal of `assert x >= 5` would have resulted with the generation of an unparsable version of the source code (empty if block).
+
+:::
+
+::::
+
+If you don't want to worry about whether a statement is required or not by yourself and leave it to Refactor, you can
+use [`EraseOrReplace`](refactor.actions.EraseOrReplace) which would end up replacing all required statements with `pass`
+statement (or any other statement that you'd pass).
+
+
+```{code-block} python
+---
+emphasize-lines: 3, 8
+---
+import ast
+from refactor import Rule, Session, common
+from refactor.actions import EraseOrReplace
+
+class EliminateDeadCode(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.If)
+        assert isinstance(node.test, ast.Constant)
+        assert isinstance(node.test.value, bool)
+        assert not node.test.value
+        assert not node.orelse
+        return EraseOrReplace(node)
+
+session = Session(rules=[EliminateDeadCode])
+print(session.run("""
+def something():
+    if False:
+        print("something!")
+        if False:
+            print("hello")
+
+def another():
+    if False:
+        print("another")
+    return "not eliminated"
+"""))
+```
+
+::::{tab-set}
+
+:::{tab-item} First iteration
+
+```python
+def something():
+    if False:
+        print("something!")
+
+def another():
+    if False:
+        print("another")
+    return "not eliminated"
+```
+
+:::
+
+:::{tab-item} Second iteration
+
+```python
+def something():
+    pass
+
+def another():
+    if False:
+        print("another")
+    return "not eliminated"
+```
+
+:::
+
+:::{tab-item} Third iteration
+
+```python
+def something():
+    pass
+
+def another():
+    return "not eliminated"
+```
+
+:::
+
+::::
+
+
 ### Lazy Variants
 
 Some actions have lazy variants, which allow you to shift building of the new
