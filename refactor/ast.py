@@ -1,5 +1,6 @@
 import ast
 import io
+import os
 import tokenize
 from collections import UserList
 from contextlib import contextmanager, nullcontext
@@ -25,7 +26,6 @@ from refactor import common
 @dataclass
 class Lines(UserList):
     lines: List[str]
-    trailing_newline: bool = False
 
     def __post_init__(self) -> None:
         super().__init__(self.lines)
@@ -33,10 +33,7 @@ class Lines(UserList):
 
     def join(self) -> str:
         """Return the combined source code."""
-        source = "\n".join(self.data)
-        if self.trailing_newline:
-            source += "\n"
-        return source
+        return "".join(self.lines)
 
     def apply_indentation(
         self,
@@ -57,17 +54,18 @@ class Lines(UserList):
         if len(self.data) >= 1:
             self.data[-1] += end_suffix
 
+    @cached_property
+    def _newline_type(self) -> str:
+        """Guess the used newline type."""
+        return os.linesep if self.lines[-1].endswith(os.linesep) else "\n"
+
 
 def split_lines(source: str) -> Lines:
     """Split the given source code into lines and
     return a list-like object (:py:class:`refactor.ast.Lines`)."""
 
     # TODO: https://github.com/python/cpython/blob/83d1430ee5b8008631e7f2a75447e740eed065c1/Lib/ast.py#L299-L321
-    trailing_newline = False
-    if len(source) >= 1:
-        trailing_newline = source[-1] == "\n"
-
-    return Lines(source.splitlines(), trailing_newline)
+    return Lines(source.splitlines(keepends=True))
 
 
 class Unparser(Protocol):

@@ -149,7 +149,9 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
             start_line[: self.node.col_offset]
         )
 
-        replacement = split_lines(context.unparse(self.build()))
+        replacement = split_lines(
+            context.unparse(self.build()) + lines._newline_type
+        )
         replacement.apply_indentation(indentation, start_prefix=start_prefix)
 
         end_line = cast(int, self.node.end_lineno)

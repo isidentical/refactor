@@ -17,7 +17,7 @@ def test_change_compute_diff(tmp_path):
             and something_else
         ):
             ...
-        
+
         def unchanged():
             return 2 + 2
         """
@@ -30,7 +30,7 @@ def test_change_compute_diff(tmp_path):
             or something_different
         ):
             ...
-        
+
         def unchanged():
             return 2 + 2
         """
@@ -39,11 +39,8 @@ def test_change_compute_diff(tmp_path):
 
     assert change.compute_diff().splitlines() == [
         f"--- {os.fspath(file)}",
-        "",
         f"+++ {os.fspath(file)}",
-        "",
         "@@ -1,8 +1,8 @@",
-        "",
         " ",
         " if (",
         "     something",
