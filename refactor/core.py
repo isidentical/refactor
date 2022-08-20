@@ -6,7 +6,16 @@ import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type
+from typing import (
+    ClassVar,
+    FrozenSet,
+    Iterator,
+    List,
+    NoReturn,
+    Optional,
+    Tuple,
+    Type,
+)
 
 # TODO: remove the deprecated aliases on 1.0.0
 from refactor.actions import (  # unimport:skip
@@ -75,6 +84,35 @@ class Session:
             if (instance := rule(context)).check_file(file)
         ]
 
+    def _apply_single(
+        self,
+        rule: Rule,
+        source_code: str,
+        action: BaseAction,
+    ) -> str:
+        action = optimize(action, rule.context)
+        return action.apply(rule.context, source_code)
+
+    def _apply_multiple(
+        self,
+        rule: Rule,
+        source_code: str,
+        actions: Iterator[BaseAction],
+    ) -> str:
+        from refactor.internal.structural_merge import (
+            merge_structural_positions,
+        )
+
+        for action in actions:
+            original_tree = rule.context.tree
+            source_code = self._apply_single(rule, source_code, action)
+            try:
+                new_tree = ast.parse(source_code)
+            except SyntaxError as exc:
+                self._unparsable_source_code(source_code, exc)
+
+            merge_structural_positions(original_tree, new_tree)
+
     def _run(
         self,
         source: str,
@@ -86,7 +124,10 @@ class Session:
         try:
             tree = ast.parse(source)
         except SyntaxError as exc:
-            return self._delegate_syntax_errors(source, _changed, exc)
+            if not _changed:
+                return source, _changed
+            else:
+                return self._unparsable_source_code(source, exc)
 
         _known_sources |= {source}
         rules = self._initialize_rules(tree, source, file)
@@ -97,25 +138,31 @@ class Session:
 
             for rule in rules:
                 with suppress(AssertionError):
-                    if action := rule.match(node):
-                        action = optimize(action, rule.context)
-                        new_source = action.apply(rule.context, source)
-                        if new_source not in _known_sources:
-                            return self._run(
-                                new_source,
-                                _changed=True,
-                                file=file,
-                                _known_sources=_known_sources,
-                            )
+                    match = rule.match(node)
+                    if match is None:
+                        continue
+                    elif isinstance(match, BaseAction):
+                        new_source = self._apply_single(rule, source, match)
+                    elif isinstance(match, Iterator):
+                        new_source = self._apply_multiple(rule, source, match)
+                    else:
+                        raise TypeError(
+                            f"Unexpected action type: {type(match).__name__}"
+                        )
+
+                    if new_source not in _known_sources:
+                        return self._run(
+                            new_source,
+                            _changed=True,
+                            file=file,
+                            _known_sources=_known_sources,
+                        )
 
         return source, _changed
 
-    def _delegate_syntax_errors(
-        self, source: str, changed: bool, exc: SyntaxError
-    ) -> Tuple[str, bool]:
-        if not changed:
-            return source, changed
-
+    def _unparsable_source_code(
+        self, source: str, exc: SyntaxError
+    ) -> NoReturn:
         error_message = "Generated source is unparsable."
 
         if self.config.debug_mode:
