@@ -36,6 +36,10 @@ from refactor.context import (
 from refactor.internal.action_optimizer import optimize
 
 
+class MaybeOverlappingActions(Exception):
+    pass
+
+
 @dataclass
 class Rule:
     context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
@@ -89,8 +93,10 @@ class Session:
         rule: Rule,
         source_code: str,
         action: BaseAction,
+        enable_optimizations: bool = True,
     ) -> str:
-        action = optimize(action, rule.context)
+        if enable_optimizations:
+            action = optimize(action, rule.context)
         return action.apply(rule.context, source_code)
 
     def _apply_multiple(
@@ -99,19 +105,40 @@ class Session:
         source_code: str,
         actions: Iterator[BaseAction],
     ) -> str:
-        from refactor.internal.structural_merge import (
-            merge_structural_positions,
+        from refactor.actions import Replace
+        from refactor.internal.ast_path import (
+            AccessFailure,
+            access,
+            compute_accesses,
         )
 
+        previous_tree = rule.context.tree
         for action in actions:
-            original_tree = rule.context.tree
-            source_code = self._apply_single(rule, source_code, action)
-            try:
-                new_tree = ast.parse(source_code)
-            except SyntaxError as exc:
-                self._unparsable_source_code(source_code, exc)
+            if not isinstance(action, Replace):
+                raise NotImplementedError(
+                    "Chained actions are only implemented for `Replace`"
+                    " action."
+                )
 
-            merge_structural_positions(original_tree, new_tree)
+            accesses = compute_accesses(rule.context, action.node)
+            try:
+                action.node = access(previous_tree, accesses)
+            except AccessFailure:
+                raise MaybeOverlappingActions(
+                    "When using chained actions, individual actions should not"
+                    " overlap with each other."
+                ) from None
+
+            # TODO: re-enable optimizations if it is viable to run
+            # them on the new tree/source code.
+            source_code = self._apply_single(
+                rule, source_code, action, enable_optimizations=False
+            )
+            try:
+                previous_tree = ast.parse(source_code)
+            except SyntaxError as exc:
+                return self._unparsable_source_code(source_code, exc)
+        return source_code
 
     def _run(
         self,
