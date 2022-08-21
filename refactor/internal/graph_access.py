@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 from dataclasses import dataclass
 from typing import Iterator, List, Type
@@ -44,22 +46,18 @@ class IndexAccess(FieldAccess):
         return accessed_node
 
 
-def compute_accesses(context: Context, node: ast.AST) -> Iterator[Access]:
-    accesses: List[Access] = []
-
+def _backtrack_node(context: Context, node: ast.AST) -> Iterator[Access]:
     cursor = node
     for ancestor_field, ancestor in context.ancestry.traverse(node):
         ancestor_field_value = getattr(ancestor, ancestor_field)
         if isinstance(ancestor_field_value, list):
-            accesses.append(
-                IndexAccess(
-                    type(cursor),
-                    ancestor_field,
-                    ancestor_field_value.index(cursor),
-                )
+            yield IndexAccess(
+                type(cursor),
+                ancestor_field,
+                ancestor_field_value.index(cursor),
             )
         elif isinstance(ancestor_field_value, ast.AST):
-            accesses.append(FieldAccess(type(cursor), ancestor_field))
+            yield FieldAccess(type(cursor), ancestor_field)
         else:
             raise TypeError(
                 "Unexpeced ancestor field type:"
@@ -68,11 +66,18 @@ def compute_accesses(context: Context, node: ast.AST) -> Iterator[Access]:
 
         cursor = ancestor
 
-    return reversed(accesses)
 
+@dataclass
+class AccessManager:
+    accesses: List[Access]
 
-def access(tree: ast.AST, accesses: Iterator[Access]) -> ast.AST:
-    node = tree
-    for access in accesses:
-        node = access.execute(node)
-    return node
+    @classmethod
+    def backtrack_from(cls, context: Context, node: ast.AST) -> AccessManager:
+        accesses = list(_backtrack_node(context, node))
+        accesses.reverse()
+        return cls(accesses)
+
+    def execute_on(self, node: ast.AST) -> ast.AST:
+        for access in self.accesses:
+            node = access.execute(node)
+        return node

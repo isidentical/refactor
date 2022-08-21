@@ -106,11 +106,7 @@ class Session:
         actions: Iterator[BaseAction],
     ) -> str:
         from refactor.actions import Replace
-        from refactor.internal.graph_access import (
-            AccessFailure,
-            access,
-            compute_accesses,
-        )
+        from refactor.internal.graph_access import AccessFailure, AccessManager
 
         previous_tree = rule.context.tree
         for action in actions:
@@ -120,9 +116,11 @@ class Session:
                     " action."
                 )
 
-            accesses = compute_accesses(rule.context, action.node)
+            access_manager = AccessManager.backtrack_from(
+                rule.context, action.node
+            )
             try:
-                action.node = access(previous_tree, accesses)
+                action.node = access_manager.execute_on(previous_tree)
             except AccessFailure:
                 raise MaybeOverlappingActions(
                     "When using chained actions, individual actions should not"
