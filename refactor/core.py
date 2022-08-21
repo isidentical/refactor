@@ -106,7 +106,7 @@ class Session:
         actions: Iterator[BaseAction],
     ) -> str:
         from refactor.actions import Replace
-        from refactor.internal.ast_path import (
+        from refactor.internal.graph_access import (
             AccessFailure,
             access,
             compute_accesses,
