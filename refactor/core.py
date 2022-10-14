@@ -15,6 +15,7 @@ from typing import (
     Optional,
     Tuple,
     Type,
+    Union,
 )
 
 # TODO: remove the deprecated aliases on 1.0.0
@@ -54,7 +55,10 @@ class Rule:
         """
         return True
 
-    def match(self, node: ast.AST) -> Optional[BaseAction]:
+    def match(
+        self,
+        node: ast.AST,
+    ) -> Union[Optional[BaseAction], Iterator[BaseAction]]:
         """Match the given ``node`` against current rule's scope.
 
         On success, it will return a source code transformation action
