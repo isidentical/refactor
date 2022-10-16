@@ -6,7 +6,17 @@ import tokenize
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import ClassVar, FrozenSet, List, Optional, Tuple, Type
+from typing import (
+    ClassVar,
+    FrozenSet,
+    Iterator,
+    List,
+    NoReturn,
+    Optional,
+    Tuple,
+    Type,
+    Union,
+)
 
 # TODO: remove the deprecated aliases on 1.0.0
 from refactor.actions import (  # unimport:skip
@@ -27,6 +37,10 @@ from refactor.context import (
 from refactor.internal.action_optimizer import optimize
 
 
+class MaybeOverlappingActions(Exception):
+    pass
+
+
 @dataclass
 class Rule:
     context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
@@ -41,7 +55,10 @@ class Rule:
         """
         return True
 
-    def match(self, node: ast.AST) -> Optional[BaseAction]:
+    def match(
+        self,
+        node: ast.AST,
+    ) -> Union[Optional[BaseAction], Iterator[BaseAction]]:
         """Match the given ``node`` against current rule's scope.
 
         On success, it will return a source code transformation action
@@ -75,6 +92,79 @@ class Session:
             if (instance := rule(context)).check_file(file)
         ]
 
+    def _apply_single(
+        self,
+        context: Context,
+        source_code: str,
+        action: BaseAction,
+        enable_optimizations: bool = True,
+    ) -> str:
+        if enable_optimizations:
+            action = optimize(action, context)
+        return action.apply(context, source_code)
+
+    def _apply_multiple(
+        self,
+        rule: Rule,
+        source_code: str,
+        actions: Iterator[BaseAction],
+    ) -> str:
+        # Compute the path of the current node (against the starting tree).
+        #
+        # Adjust this path with the knowledge from the previously applied
+        # actions.
+        #
+        # Use the path to find the correct node in the new tree.
+
+        from refactor.internal.graph_access import AccessFailure, GraphPath
+
+        shifts: List[Tuple[GraphPath, int]] = []
+        previous_tree = rule.context.tree
+        for action in actions:
+            input_node, stack_effect = action._stack_effect()
+
+            # We compute each path against the initial revision of the tree
+            # since the rule who is producing them doesn't have access to the
+            # temporary trees we generate on the fly.
+            path = GraphPath.backtrack_from(rule.context, input_node)
+
+            # And due to this, some actions might have altered the tree in a
+            # way that makes the path as is invalid. For ensuring that the path
+            # now reflects the current state of the tree, we apply all the shifts
+            # that the previous actions have caused.
+            path = path.shift(shifts)
+
+            # With the updated path, we can now find the same node in the new
+            # tree. This allows us to know the exact position of the node.
+            try:
+                updated_input = path.execute(previous_tree)
+            except AccessFailure:
+                raise MaybeOverlappingActions(
+                    "When using chained actions, individual actions should not"
+                    " overlap with each other."
+                ) from None
+            else:
+                shifts.append((path, stack_effect))
+
+            updated_action = action._replace_input(updated_input)
+            updated_context = rule.context.replace(
+                source=source_code, tree=previous_tree
+            )
+
+            # TODO: re-enable optimizations if it is viable to run
+            # them on the new tree/source code.
+            source_code = self._apply_single(
+                updated_context,
+                source_code,
+                updated_action,
+                enable_optimizations=False,
+            )
+            try:
+                previous_tree = ast.parse(source_code)
+            except SyntaxError as exc:
+                return self._unparsable_source_code(source_code, exc)
+        return source_code
+
     def _run(
         self,
         source: str,
@@ -86,7 +176,10 @@ class Session:
         try:
             tree = ast.parse(source)
         except SyntaxError as exc:
-            return self._delegate_syntax_errors(source, _changed, exc)
+            if not _changed:
+                return source, _changed
+            else:
+                return self._unparsable_source_code(source, exc)
 
         _known_sources |= {source}
         rules = self._initialize_rules(tree, source, file)
@@ -97,25 +190,33 @@ class Session:
 
             for rule in rules:
                 with suppress(AssertionError):
-                    if action := rule.match(node):
-                        action = optimize(action, rule.context)
-                        new_source = action.apply(rule.context, source)
-                        if new_source not in _known_sources:
-                            return self._run(
-                                new_source,
-                                _changed=True,
-                                file=file,
-                                _known_sources=_known_sources,
-                            )
+                    match = rule.match(node)
+                    if match is None:
+                        continue
+                    elif isinstance(match, BaseAction):
+                        new_source = self._apply_single(
+                            rule.context, source, match
+                        )
+                    elif isinstance(match, Iterator):
+                        new_source = self._apply_multiple(rule, source, match)
+                    else:
+                        raise TypeError(
+                            f"Unexpected action type: {type(match).__name__}"
+                        )
+
+                    if new_source not in _known_sources:
+                        return self._run(
+                            new_source,
+                            _changed=True,
+                            file=file,
+                            _known_sources=_known_sources,
+                        )
 
         return source, _changed
 
-    def _delegate_syntax_errors(
-        self, source: str, changed: bool, exc: SyntaxError
-    ) -> Tuple[str, bool]:
-        if not changed:
-            return source, changed
-
+    def _unparsable_source_code(
+        self, source: str, exc: SyntaxError
+    ) -> NoReturn:
         error_message = "Generated source is unparsable."
 
         if self.config.debug_mode:

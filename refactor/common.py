@@ -348,3 +348,20 @@ def _hint(handler: str, *args: Any, **kwargs: Any) -> Callable[[C], C]:
         return obj
 
     return wrapper
+
+
+def _allow_asserts(func: Callable[..., T]) -> Callable[..., T]:
+    """Internal function to allow 'real' asserts in the Refactor core (so that even
+    if there are AssertionError's, they won't be hidden)."""
+
+    @wraps(func)
+    def inner(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except AssertionError as exc:
+            raise RuntimeError(
+                "An internal problem occurred in the Refactor core. "
+                "Please report this on the issue tracker."
+            ) from exc
+
+    return inner

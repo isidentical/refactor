@@ -3,7 +3,7 @@ import textwrap
 import typing
 from copy import deepcopy
 from dataclasses import dataclass
-from typing import List, Optional, Sequence
+from typing import Iterator, List, Optional, Sequence, Union
 
 import pytest
 
@@ -584,6 +584,120 @@ class RemoveDeadCode(Rule):
         return EraseOrReplace(node)
 
 
+class DownstreamAnalyzer(Representative):
+    context_providers = (context.Scope,)
+
+    def iter_dependents(
+        self, name: str, source: Union[ast.Import, ast.ImportFrom]
+    ) -> Iterator[ast.Name]:
+        for node in ast.walk(self.context.tree):
+            if (
+                isinstance(node, ast.Name)
+                and isinstance(node.ctx, ast.Load)
+                and node.id == name
+            ):
+                node_scope = self.context.scope.resolve(node)
+                definitions = node_scope.get_definitions(name) or []
+                if any(definition is source for definition in definitions):
+                    yield node
+
+
+class RenameImportAndDownstream(Rule):
+    context_providers = (DownstreamAnalyzer,)
+
+    INPUT_SOURCE = """
+        import a
+
+        a.do_something()
+
+        for _ in a.iter():
+            print(
+                a
+                        + 1
+                           + 3
+            )
+
+        @a.series
+        def f():
+            import a
+
+            class Z(a.Backport):
+                meth = a.method
+
+            return a.backport()
+
+        a
+
+        def multi():
+            if A:
+                if B:
+                    import a
+                else:
+                    import a
+            else:
+                import a
+
+            for _ in range(x):
+                a.do_something()
+
+            return a.dot()
+        """
+
+    EXPECTED_SOURCE = """
+        import b
+
+        b.do_something()
+
+        for _ in b.iter():
+            print(
+                b
+                        + 1
+                           + 3
+            )
+
+        @b.series
+        def f():
+            import b
+
+            class Z(b.Backport):
+                meth = b.method
+
+            return b.backport()
+
+        b
+
+        def multi():
+            if A:
+                if B:
+                    import b
+                else:
+                    import b
+            else:
+                import b
+
+            for _ in range(x):
+                b.do_something()
+
+            return b.dot()
+        """
+
+    def match(self, node: ast.AST) -> Iterator[Replace]:
+        assert isinstance(node, (ast.Import, ast.ImportFrom))
+
+        aliases = [alias for alias in node.names if alias.name == "a"]
+        assert len(aliases) == 1
+
+        [alias] = aliases
+        for dependent in self.context.downstream_analyzer.iter_dependents(
+            alias.asname or alias.name, node
+        ):
+            yield Replace(dependent, ast.Name("b", ast.Load()))
+
+        replacement = common.clone(node)
+        replacement.names[node.names.index(alias)].name = "b"
+        yield Replace(node, replacement)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -595,6 +709,7 @@ class RemoveDeadCode(Rule):
         OnlyKeywordArgumentDefaultNotSetCheckRule,
         InternalizeFunctions,
         RemoveDeadCode,
+        RenameImportAndDownstream,
     ],
 )
 def test_complete_rules(rule):
