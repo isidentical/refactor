@@ -94,14 +94,14 @@ class Session:
 
     def _apply_single(
         self,
-        rule: Rule,
+        context: Context,
         source_code: str,
         action: BaseAction,
         enable_optimizations: bool = True,
     ) -> str:
         if enable_optimizations:
-            action = optimize(action, rule.context)
-        return action.apply(rule.context, source_code)
+            action = optimize(action, context)
+        return action.apply(context, source_code)
 
     def _apply_multiple(
         self,
@@ -109,32 +109,55 @@ class Session:
         source_code: str,
         actions: Iterator[BaseAction],
     ) -> str:
-        from refactor.actions import Replace
-        from refactor.internal.graph_access import AccessFailure, AccessManager
+        # Compute the path of the current node (against the starting tree).
+        #
+        # Adjust this path with the knowledge from the previously applied
+        # actions.
+        #
+        # Use the path to find the correct node in the new tree.
 
+        from refactor.internal.graph_access import AccessFailure, GraphPath
+
+        shifts: List[Tuple[GraphPath, int]] = []
         previous_tree = rule.context.tree
         for action in actions:
-            if not isinstance(action, Replace):
-                raise NotImplementedError(
-                    "Chained actions are only implemented for `Replace`"
-                    " action."
-                )
+            input_node, stack_effect = action._stack_effect()
 
-            access_manager = AccessManager.backtrack_from(
-                rule.context, action.node
-            )
+            # We compute each path against the initial revision of the tree
+            # since the rule who is producing them doesn't have access to the
+            # temporary trees we generate on the fly.
+            path = GraphPath.backtrack_from(rule.context, input_node)
+
+            # And due to this, some actions might have altered the tree in a
+            # way that makes the path as is invalid. For ensuring that the path
+            # now reflects the current state of the tree, we apply all the shifts
+            # that the previous actions have caused.
+            path = path.shift(shifts)
+
+            # With the updated path, we can now find the same node in the new
+            # tree. This allows us to know the exact position of the node.
             try:
-                action.node = access_manager.execute_on(previous_tree)
+                updated_input = path.execute(previous_tree)
             except AccessFailure:
                 raise MaybeOverlappingActions(
                     "When using chained actions, individual actions should not"
                     " overlap with each other."
                 ) from None
+            else:
+                shifts.append((path, stack_effect))
+
+            updated_action = action._replace_input(updated_input)
+            updated_context = rule.context.replace(
+                source=source_code, tree=previous_tree
+            )
 
             # TODO: re-enable optimizations if it is viable to run
             # them on the new tree/source code.
             source_code = self._apply_single(
-                rule, source_code, action, enable_optimizations=False
+                updated_context,
+                source_code,
+                updated_action,
+                enable_optimizations=False,
             )
             try:
                 previous_tree = ast.parse(source_code)
@@ -171,7 +194,9 @@ class Session:
                     if match is None:
                         continue
                     elif isinstance(match, BaseAction):
-                        new_source = self._apply_single(rule, source, match)
+                        new_source = self._apply_single(
+                            rule.context, source, match
+                        )
                     elif isinstance(match, Iterator):
                         new_source = self._apply_multiple(rule, source, match)
                     else:

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from collections import defaultdict, deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 from functools import cached_property
 from pathlib import Path
@@ -97,6 +97,10 @@ class Context:
             representative = raw_representative(self)
             self.metadata[representative.name] = representative
 
+    def _update_metadata(self) -> None:
+        for key, representative in self.metadata.copy().items():
+            self.metadata[key] = type(representative)(self)
+
     def unparse(self, node: ast.AST) -> str:
         """Re-synthesize the source code for the given ``node``."""
 
@@ -142,6 +146,12 @@ class Context:
             return self[attr]
         except ValueError:
             raise AttributeError(f"{self!r} has no attribute {attr!r}")
+
+    def replace(self, *args: Any, **kwargs: Any) -> Context:
+        """Return a new context object with the given arguments replaced."""
+        new_cls = replace(self, *args, **kwargs)
+        new_cls._update_metadata()
+        return new_cls
 
 
 @dataclass
