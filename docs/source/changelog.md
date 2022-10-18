@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.6.0
+
+### Other Changes
+- Encoding is now preserved when using the `refactor.Session.run_file` API (which means if you use the `refactor.Change.apply_diff` or using the `-a` flag in the CLI, the generated source code will be encoded
+with the original encoding before getting written to the file.)
+- Offset tracking has been changed to be at the encoded byte stream level (mirroring CPython behavior here). This fixes some unicode related problems (with actions like `refactor.actions.Replace`).
+
 ## 0.5.0
 
 ### Major
