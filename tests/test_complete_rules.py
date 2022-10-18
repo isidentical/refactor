@@ -3,6 +3,7 @@ import textwrap
 import typing
 from copy import deepcopy
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Iterator, List, Optional, Sequence, Union
 
 import pytest
@@ -768,7 +769,7 @@ class AssertEncoder(Rule):
         AssertEncoder,
     ],
 )
-def test_complete_rules(rule):
+def test_complete_rules(rule, tmp_path):
     session = Session([rule])
 
     source_code = textwrap.dedent(rule.INPUT_SOURCE)
@@ -778,3 +779,12 @@ def test_complete_rules(rule):
         pytest.fail("Input source is not valid Python code")
 
     assert session.run(source_code) == textwrap.dedent(rule.EXPECTED_SOURCE)
+
+    src_file_path = Path(tmp_path / rule.__name__.lower()).with_suffix(".py")
+    src_file_path.write_text(source_code)
+
+    change = session.run_file(src_file_path)
+    assert change is not None
+
+    change.apply_diff()
+    assert src_file_path.read_text() == textwrap.dedent(rule.EXPECTED_SOURCE)
