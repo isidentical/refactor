@@ -698,6 +698,61 @@ class RenameImportAndDownstream(Rule):
         yield Replace(node, replacement)
 
 
+class AssertEncoder(Rule):
+    INPUT_SOURCE = """
+        print(hello)
+        assert "aaaaaBBBBcccc", "len=1"
+        print('''
+        test🥰🥰🥰
+        © ®© ®
+        ''')
+        assert "©© ®®copyrighted®® ©©©", "len=2"
+        print(hello)
+        if something:
+            assert (
+                "🥰 😎 😇 print\
+                    🥰 😎 😇"
+            ), "some emojisss"
+
+            def ensure():
+                assert "€urre€y of eu™", "len=3"
+
+        print("refactor  🚀 🚀")
+    """
+
+    EXPECTED_SOURCE = """
+        print(hello)
+        assert decrypt('<aaaaaBBBBcccc>'), "len=1"
+        print('''
+        test🥰🥰🥰
+        © ®© ®
+        ''')
+        assert decrypt('<©© ®®copyrighted®® ©©©>'), "len=2"
+        print(hello)
+        if something:
+            assert (
+                decrypt('<🥰 😎 😇 print                    🥰 😎 😇>')
+            ), "some emojisss"
+
+            def ensure():
+                assert decrypt('<€urre€y of eu™>'), "len=3"
+
+        print("refactor  🚀 🚀")
+    """
+
+    def match(self, node: ast.AST) -> Replace:
+        assert isinstance(node, ast.Assert)
+        assert isinstance(test := node.test, ast.Constant)
+        assert isinstance(inner_text := test.value, str)
+
+        encrypt_call = ast.Call(
+            func=ast.Name("decrypt"),
+            args=[ast.Constant(f"<{inner_text}>")],
+            keywords=[],
+        )
+        return Replace(test, encrypt_call)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -710,11 +765,16 @@ class RenameImportAndDownstream(Rule):
         InternalizeFunctions,
         RemoveDeadCode,
         RenameImportAndDownstream,
+        AssertEncoder,
     ],
 )
 def test_complete_rules(rule):
     session = Session([rule])
 
-    assert session.run(textwrap.dedent(rule.INPUT_SOURCE)) == textwrap.dedent(
-        rule.EXPECTED_SOURCE
-    )
+    source_code = textwrap.dedent(rule.INPUT_SOURCE)
+    try:
+        ast.parse(source_code)
+    except SyntaxError:
+        pytest.fail("Input source is not valid Python code")
+
+    assert session.run(source_code) == textwrap.dedent(rule.EXPECTED_SOURCE)

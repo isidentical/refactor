@@ -11,6 +11,7 @@ from refactor.context import Configuration, Context, Representative
 from refactor.core import Rule, Session
 
 fake_ctx = Context(source="<test>", tree=ast.AST())
+test_file = common._FileInfo()
 
 
 @pytest.mark.parametrize(
@@ -205,7 +206,10 @@ class RecursiveRule(Rule):
 def test_session_run_deterministic():
     session = Session([RecursiveRule])
 
-    refactored_source, changed = session._run("2 + 2 + 3 + 4")
+    # Using _run here to see the 'changed' flag in action.
+    refactored_source, changed = session._run(
+        "2 + 2 + 3 + 4", file_info=test_file
+    )
     assert not changed
     assert refactored_source == "2 + 2 + 3 + 4"
 

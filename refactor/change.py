@@ -4,6 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from refactor.ast import split_lines
+from refactor.common import _FileInfo
 
 
 @dataclass
@@ -14,9 +15,13 @@ class Change:
     variant.
     """
 
-    file: Path
+    file_info: _FileInfo
     original_source: str
     refactored_source: str
+
+    def __post_init__(self):
+        if self.file_info.path is None:
+            raise ValueError("Can't apply a change to a string")
 
     def compute_diff(self) -> str:
         """Compute the line-based diff between original and the
@@ -35,5 +40,16 @@ class Change:
 
     def apply_diff(self) -> None:
         """Apply the transformed version to the bound file."""
-        with open(self.file, "w") as stream:
-            stream.write(self.refactored_source)
+        raw_source = self.refactored_source.encode(
+            self.file_info.get_encoding()
+        )
+
+        with open(self.file, "wb") as stream:
+            stream.write(raw_source)
+
+    @property
+    def file(self) -> Path:
+        """Returns the bound file."""
+        if self.file_info.path is None:
+            raise ValueError("Change expects a valid file")
+        return self.file_info.path

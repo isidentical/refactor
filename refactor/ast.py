@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import ast
 import io
+import operator
 import os
 import tokenize
-from collections import UserList
+from collections import UserList, UserString
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
@@ -15,17 +18,24 @@ from typing import (
     Optional,
     Protocol,
     Set,
+    SupportsIndex,
     Tuple,
+    TypeVar,
     Union,
     cast,
 )
 
 from refactor import common
 
+DEFAULT_ENCODING = "utf-8"
+
+AnyStringType = Union[str, "SourceSegment"]
+StringType = TypeVar("StringType", bound=AnyStringType)
+
 
 @dataclass
-class Lines(UserList):
-    lines: List[str]
+class Lines(UserList[StringType]):
+    lines: List[StringType]
 
     def __post_init__(self) -> None:
         super().__init__(self.lines)
@@ -33,26 +43,26 @@ class Lines(UserList):
 
     def join(self) -> str:
         """Return the combined source code."""
-        return "".join(self.lines)
+        return "".join(map(str, self.lines))
 
     def apply_indentation(
         self,
-        indentation: str,
+        indentation: StringType,
         *,
-        start_prefix: str = "",
-        end_suffix: str = "",
+        start_prefix: AnyStringType = "",
+        end_suffix: AnyStringType = "",
     ) -> None:
         """Apply the given indentation, optionally with start and end prefixes
         to the bound source lines."""
 
         for index, line in enumerate(self.data):
             if index == 0:
-                self.data[index] = indentation + start_prefix + line
+                self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
             else:
-                self.data[index] = indentation + line
+                self.data[index] = indentation + line  # type: ignore
 
         if len(self.data) >= 1:
-            self.data[-1] += end_suffix
+            self.data[-1] += str(end_suffix)  # type: ignore
 
     @cached_property
     def _newline_type(self) -> str:
@@ -60,12 +70,46 @@ class Lines(UserList):
         return os.linesep if self.lines[-1].endswith(os.linesep) else "\n"
 
 
-def split_lines(source: str) -> Lines:
+@dataclass
+class SourceSegment(UserString):
+    """Adapter for holding a line of source code that can be sliced
+    with AST-native column offsets. Internally on every partitioning
+    operation, the offsets will be assumed as UTF-8 encoded byte
+    offsets (which is the default Refactor operates on)."""
+
+    data: str
+    encoding: str = DEFAULT_ENCODING
+
+    def __getitem__(self, index: Union[SupportsIndex, slice]) -> SourceSegment:
+        raw_line = self.encode(encoding=self.encoding)
+        if isinstance(index, slice):
+            view = raw_line[index].decode(encoding=self.encoding)
+        else:
+            # Using a direct index here (e.g. a[1]) would cause bytes to return an
+            # integer (on some cases), but we want to deal with strings so this path
+            # re-implements the direct indexing as slicing (e.g. a[1] is a[1:2], with
+            # error handling).
+            direct_index = operator.index(index)
+            view = raw_line[direct_index : direct_index + 1].decode(
+                encoding=self.encoding
+            )
+            if not view:
+                raise IndexError("index out of range")
+
+        return SourceSegment(view, encoding=self.encoding)
+
+
+def split_lines(source: str, *, encoding: Optional[str] = None) -> Lines:
     """Split the given source code into lines and
     return a list-like object (:py:class:`refactor.ast.Lines`)."""
 
     # TODO: https://github.com/python/cpython/blob/83d1430ee5b8008631e7f2a75447e740eed065c1/Lib/ast.py#L299-L321
-    return Lines(source.splitlines(keepends=True))
+
+    lines = source.splitlines(keepends=True)
+    if encoding is not None:
+        lines = [SourceSegment(line, encoding=encoding) for line in lines]  # type: ignore
+
+    return Lines(lines)
 
 
 class Unparser(Protocol):

@@ -27,7 +27,7 @@ from refactor.actions import (  # unimport:skip
     TargetedNewStatementAction,
 )
 from refactor.change import Change
-from refactor.common import has_positions
+from refactor.common import _FileInfo, has_positions
 from refactor.context import (
     Configuration,
     Context,
@@ -48,7 +48,8 @@ class Rule:
     context: Context
 
     def check_file(self, path: Optional[Path]) -> bool:
-        """Check whether to process the given ``path``.
+        """Check whether to process the given ``path``. If ``path`` is `None`,
+        that means the user has submitted a string to be processed.
 
         By default it will always be `True` but can be overridden
         in subclasses.
@@ -77,19 +78,22 @@ class Session:
     config: Configuration = field(default_factory=Configuration)
 
     def _initialize_rules(
-        self, tree: ast.Module, source: str, file: Optional[Path]
+        self,
+        tree: ast.Module,
+        source: str,
+        file_info: _FileInfo,
     ) -> List[Rule]:
         context = Context._from_dependencies(
             _resolve_dependencies(self.rules),
             tree=tree,
             source=source,
-            file=file,
+            file_info=file_info,
             config=self.config,
         )
         return [
             instance
             for rule in self.rules
-            if (instance := rule(context)).check_file(file)
+            if (instance := rule(context)).check_file(file_info.path)
         ]
 
     def _apply_single(
@@ -168,7 +172,7 @@ class Session:
     def _run(
         self,
         source: str,
-        file: Optional[Path] = None,
+        file_info: _FileInfo,
         *,
         _changed: bool = False,
         _known_sources: FrozenSet[str] = frozenset(),
@@ -182,7 +186,7 @@ class Session:
                 return self._unparsable_source_code(source, exc)
 
         _known_sources |= {source}
-        rules = self._initialize_rules(tree, source, file)
+        rules = self._initialize_rules(tree, source, file_info)
 
         for node in ast.walk(tree):
             if not has_positions(type(node)):  # type: ignore
@@ -207,8 +211,8 @@ class Session:
                     if new_source not in _known_sources:
                         return self._run(
                             new_source,
+                            file_info,
                             _changed=True,
-                            file=file,
                             _known_sources=_known_sources,
                         )
 
@@ -227,7 +231,7 @@ class Session:
 
         raise ValueError(error_message) from exc
 
-    def run(self, source: str, *, file: Optional[Path] = None) -> str:
+    def run(self, source: str) -> str:
         """Apply all the rules from this session to the given ``source``
         and return the transformed version.
 
@@ -235,7 +239,7 @@ class Session:
         it unchanged.
         """
 
-        source, _ = self._run(source)
+        source, _ = self._run(source, file_info=_FileInfo())
         return source
 
     def run_file(self, file: Path) -> Optional[Change]:
@@ -248,12 +252,12 @@ class Session:
         try:
             with tokenize.open(file) as stream:
                 source = stream.read()
+                encoding = stream.encoding
         except (SyntaxError, UnicodeDecodeError):
             return None
 
-        new_source, is_changed = self._run(source, file=file)
+        file_info = _FileInfo(file, encoding)
+        new_source, is_changed = self._run(source, file_info)
 
         if is_changed:
-            return Change(file, source, new_source)
-        else:
-            return None
+            return Change(file_info, source, new_source)
