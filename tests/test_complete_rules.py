@@ -15,6 +15,7 @@ from refactor.actions import (
     LazyReplace,
     Replace,
 )
+from refactor.ast import DEFAULT_ENCODING
 from refactor.context import Representative, Scope, ScopeType
 
 
@@ -781,10 +782,12 @@ def test_complete_rules(rule, tmp_path):
     assert session.run(source_code) == textwrap.dedent(rule.EXPECTED_SOURCE)
 
     src_file_path = Path(tmp_path / rule.__name__.lower()).with_suffix(".py")
-    src_file_path.write_text(source_code)
+    src_file_path.write_text(source_code, encoding=DEFAULT_ENCODING)
 
     change = session.run_file(src_file_path)
     assert change is not None
 
     change.apply_diff()
-    assert src_file_path.read_text() == textwrap.dedent(rule.EXPECTED_SOURCE)
+    assert src_file_path.read_text(
+        encoding=DEFAULT_ENCODING
+    ) == textwrap.dedent(rule.EXPECTED_SOURCE)
