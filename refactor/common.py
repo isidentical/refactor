@@ -3,7 +3,9 @@ from __future__ import annotations
 import ast
 import copy
 from collections import deque
+from dataclasses import dataclass
 from functools import cache, singledispatch, wraps
+from pathlib import Path
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -25,6 +27,22 @@ if TYPE_CHECKING:
 T = TypeVar("T")
 C = TypeVar("C")
 PositionType = Tuple[int, int, int, int]
+
+
+@dataclass
+class _FileInfo:
+    """Represents information regarding the source code (the
+    file it was read from, the encoding, etc.)"""
+
+    path: Optional[Path] = None
+    encoding: Optional[str] = None
+
+    def get_encoding(self) -> str:
+        """Return the encoding for this file (if it doesn't exist,
+        it returns the default encoding -- utf8)."""
+        from refactor.ast import DEFAULT_ENCODING
+
+        return self.encoding or DEFAULT_ENCODING
 
 
 def clone(node: T) -> T:

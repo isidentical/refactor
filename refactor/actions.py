@@ -85,7 +85,7 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
 
 class _ReplaceCodeSegmentAction(BaseAction):
     def apply(self, context: Context, source: str) -> str:
-        lines = split_lines(source)
+        lines = split_lines(source, encoding=context.file_info.get_encoding())
         (
             lineno,
             col_offset,
@@ -94,9 +94,10 @@ class _ReplaceCodeSegmentAction(BaseAction):
         ) = self._get_segment_span(context)
 
         view = slice(lineno - 1, end_lineno)
-        target_lines = lines[view]
-        indentation, start_prefix = find_indent(target_lines[0][:col_offset])
-        end_suffix = target_lines[-1][end_col_offset:]
+        source_lines = lines[view]
+
+        indentation, start_prefix = find_indent(source_lines[-1][:col_offset])
+        end_suffix = source_lines[-1][end_col_offset:]
 
         replacement = split_lines(self._resynthesize(context))
         replacement.apply_indentation(
@@ -176,11 +177,9 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
     """
 
     def apply(self, context: Context, source: str) -> str:
-        lines = split_lines(source)
-
-        start_line = lines[self.node.lineno - 1]
+        lines = split_lines(source, encoding=context.file_info.get_encoding())
         indentation, start_prefix = find_indent(
-            start_line[: self.node.col_offset]
+            lines[self.node.lineno - 1][: self.node.col_offset]
         )
 
         replacement = split_lines(

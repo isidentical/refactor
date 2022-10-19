@@ -75,7 +75,7 @@ class Context:
     source: str
     tree: ast.AST
 
-    file: Optional[Path] = None
+    file_info: common._FileInfo = field(default_factory=common._FileInfo)
     config: Configuration = field(default_factory=Configuration)
     metadata: Dict[str, Representative] = field(default_factory=dict)
 
@@ -152,6 +152,10 @@ class Context:
         new_cls = replace(self, *args, **kwargs)
         new_cls._update_metadata()
         return new_cls
+
+    @property
+    def file(self) -> Optional[Path]:
+        return self.file_info.path
 
 
 @dataclass

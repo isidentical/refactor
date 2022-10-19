@@ -2,13 +2,14 @@ import os
 import textwrap
 from pathlib import Path
 
+from refactor import common
 from refactor.change import Change
 
 
 def test_change_compute_diff(tmp_path):
-    file = Path(tmp_path)
+    file_info = common._FileInfo(path=Path(tmp_path / "test.py"))
     change = Change(
-        file,
+        file_info,
         textwrap.dedent(
             """
         if (
@@ -38,8 +39,8 @@ def test_change_compute_diff(tmp_path):
     )
 
     assert change.compute_diff().splitlines() == [
-        f"--- {os.fspath(file)}",
-        f"+++ {os.fspath(file)}",
+        f"--- {os.fspath(file_info.path)}",
+        f"+++ {os.fspath(file_info.path)}",
         "@@ -1,8 +1,8 @@",
         " ",
         " if (",

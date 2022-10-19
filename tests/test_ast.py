@@ -4,6 +4,7 @@ import tokenize
 
 import pytest
 
+from refactor import common
 from refactor.ast import BaseUnparser, PreciseUnparser, split_lines
 
 
@@ -27,6 +28,50 @@ def test_split_lines():
         "):\n",
         "    print(z)\n",
     ]
+
+
+@pytest.mark.parametrize(
+    "case",
+    [
+        """
+            print(normal)
+            print('🚀 🚀 🚀')
+            print(
+                '🚀 🚀 🚀 $$ '
+                ' $$ 🚀 🚀 🚀'
+            )
+            print('天 小 末')
+            末 = '🚀 🚀 🚀' * 4
+        """
+    ],
+)
+def test_split_lines_with_encoding(case):
+    case = textwrap.dedent(case)
+    lines = split_lines(case, encoding="utf-8")
+    assert lines.join() == case
+
+    for node in ast.walk(ast.parse(case)):
+        if not common.has_positions(type(node)):
+            continue
+
+        (
+            lineno,
+            col_offset,
+            end_lineno,
+            end_col_offset,
+        ) = common.position_for(node)
+        lineno, end_lineno = lineno - 1, end_lineno - 1
+
+        if end_lineno == lineno:
+            match = lines[lineno][col_offset:end_col_offset]
+        else:
+            start_line = lines[lineno][col_offset:]
+            end_line = lines[end_lineno][:end_col_offset]
+            match = (
+                start_line + lines[lineno + 1 : end_lineno].join() + end_line
+            )
+
+        assert str(match) == ast.get_source_segment(case, node)
 
 
 @pytest.mark.parametrize(
