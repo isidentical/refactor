@@ -234,7 +234,7 @@ statement (or any other statement that you'd pass).
 
 ```{code-block} python
 ---
-emphasize-lines: 3, 8
+emphasize-lines: 3, 12
 ---
 import ast
 from refactor import Rule, Session, common
@@ -392,3 +392,194 @@ class DummyRule(Rule):
 
 :::
 ::::
+
+### Chained Actions
+
+```{tip}
+Chained actions are still an experimental feature. If you discover a bug or feel
+like something is confusing, we would love to hear back from you in our
+[issue tracker](https://github.com/isidentical/refactor/issues).
+```
+
+Up until now, all the examples were about {term}`rule`s that return a single
+{term}`action` from their `match()` method. But what if you are looking to build
+something more complicated, for example a renaming tool, that would need to
+replace everything in one go (instead of multiple iterations)? Exactly for
+problems like this, we allow you to chain multiple actions of supported types
+(currently `Replace`, `InsertAfter`, `Erase` [and their lazy variants]; but we
+are exploring other actions as well) to return a composite action from
+`match()`.
+
+Chaining occurs automatically when you yield actions instead of returning them.
+Any {term}`rule` can yield any number of {term}`actions`s as long as all of them
+are supports chaining **and** the scope of the previous {term}`action`s doesn't
+overlap with the scope of the subsequent {term}`action`s.
+
+```{code-block} python
+---
+emphasize-lines: 30, 33
+---
+class Usages(Representative):
+    context_providers = (Scope,)
+
+    def find(self, name: str, needle: ast.AST) -> Iterator[ast.AST]:
+        """Iterate all possible usage sites of ``name``."""
+        for node in ast.walk(self.context.tree):
+            if isinstance(node, ast.Name) and node.id == name:
+                scope = self.context.scope.resolve(node)
+                if needle in scope.get_definitions(name):
+                    yield node
+
+class PropagateAndDelete(Rule):
+    context_providers = (Usages,)
+
+    def match(self, node: ast.AST) -> Iterator[BaseAction]:
+        # Check if this is a single import with no alias.
+        assert isinstance(node, ast.Import)
+        assert len(node.names) == 1
+
+        [name] = node.names
+        assert name.asname is None
+
+        # Replace each usage of this module with its own __import__() call.
+        import_call = ast.Call(
+            func=ast.Name("__import__"),
+            args=[ast.Constant(name.name)],
+            keywords=[],
+        )
+        for usage in self.context.usages.find(name.name, node):
+            yield Replace(usage, import_call)
+
+        # And finally remove the import itself
+        yield Erase(node)
+```
+
+::::{tab-set}
+
+:::{tab-item} Source
+
+```py
+import ast
+import foo
+
+def traverse():
+    import bar
+    for node in ast.walk(ast.parse("1 + 2")):
+        dump(node, bar.loads())
+
+def dump(node, loaded):
+    import zoo
+    zoo.check(loaded)
+    print(ast.dump(node))
+
+def no():
+    ast = 1
+    print(ast)
+
+class T(ast.NodeTransformer):
+    traverse()
+```
+
+:::
+
+:::{tab-item} First iteration
+
+```python
+import foo
+
+def traverse():
+    import bar
+    for node in __import__('ast').walk(__import__('ast').parse("1 + 2")):
+        dump(node, bar.loads())
+
+def dump(node, loaded):
+    import zoo
+    zoo.check(loaded)
+    print(__import__('ast').dump(node))
+
+def no():
+    ast = 1
+    print(ast)
+
+class T(__import__('ast').NodeTransformer):
+    traverse()
+```
+
+:::
+
+:::{tab-item} Second iteration
+
+```python
+def traverse():
+    import bar
+    for node in __import__('ast').walk(__import__('ast').parse("1 + 2")):
+        dump(node, bar.loads())
+
+def dump(node, loaded):
+    import zoo
+    zoo.check(loaded)
+    print(__import__('ast').dump(node))
+
+def no():
+    ast = 1
+    print(ast)
+
+class T(__import__('ast').NodeTransformer):
+    traverse()
+```
+
+:::
+
+:::{tab-item} Third iteration
+
+```python
+def traverse():
+    for node in __import__('ast').walk(__import__('ast').parse("1 + 2")):
+        dump(node, __import__('bar').loads())
+
+def dump(node, loaded):
+    import zoo
+    zoo.check(loaded)
+    print(__import__('ast').dump(node))
+
+def no():
+    ast = 1
+    print(ast)
+
+class T(__import__('ast').NodeTransformer):
+    traverse()
+```
+
+:::
+
+:::{tab-item} Fourth iteration
+
+```python
+def traverse():
+    for node in __import__('ast').walk(__import__('ast').parse("1 + 2")):
+        dump(node, __import__('bar').loads())
+
+def dump(node, loaded):
+    __import__('zoo').check(loaded)
+    print(__import__('ast').dump(node))
+
+def no():
+    ast = 1
+    print(ast)
+
+class T(__import__('ast').NodeTransformer):
+    traverse()
+```
+
+:::
+
+::::
+
+
+As you can notice; in each iteration, we have applied 1 or more actions
+together. In a chained fashion. In the case above; none of the expressions
+overlap with each other, so the order did not matter much, but if the
+{term}`rule` you are building involes overlapping nodes; then you should order
+your actions from the smallest source scope to the biggest one (so the final one
+can actually change anything it needs to, since it doesn't have any subsequent
+actions).
