@@ -28,7 +28,7 @@ class PropagateMyConstants(refactor.Rule):
         assert isinstance(node.ctx, ast.Load)
 
         scope = self.context.scope.resolve(node)
-        definitions = scope.get_definitions(node.id) or []
+        definitions = scope.get_definitions(node.id)
         assert len(definitions) == 1
 
         definition = definitions[0]

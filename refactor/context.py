@@ -271,16 +271,14 @@ class ScopeInfo(common._Singleton):
         else:
             return False
 
-    def get_definitions(self, name: str) -> Optional[List[ast.AST]]:
+    def get_definitions(self, name: str) -> List[ast.AST]:
         """Return all the definitions of the given `name` that
-        this scope can reach.
-
-        Returns `None` if no definitions are found."""
+        this scope can reach. Returns an empty list if there is None."""
         for reachable_scope in self._iter_reachable_scopes():
             if reachable_scope.defines(name):
                 return reachable_scope.definitions[name]
         else:
-            return None
+            return []
 
     def defines(self, name: str) -> bool:
         """Return whether this scope defines the given `name`."""

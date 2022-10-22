@@ -10,6 +10,7 @@ import pytest
 
 from refactor import BaseAction, Rule, Session, common, context
 from refactor.actions import (
+    Erase,
     EraseOrReplace,
     LazyInsertAfter,
     LazyReplace,
@@ -434,7 +435,7 @@ class InternalizeFunctions(Rule):
         global_scope = self.context.scope.global_scope
 
         try:
-            [raw_definition] = global_scope.get_definitions("__all__") or []
+            [raw_definition] = global_scope.get_definitions("__all__")
         except ValueError:
             return None
 
@@ -572,7 +573,7 @@ class RemoveDeadCode(Rule):
             static_condition = node.test.value
         elif isinstance(node.test, ast.Name):
             node_scope = self.context.scope.resolve(node)
-            definitions = node_scope.get_definitions(node.test.id) or []
+            definitions = node_scope.get_definitions(node.test.id)
             assert len(definitions) == 1 and isinstance(
                 definition := definitions[0], ast.Assign
             )
@@ -599,7 +600,7 @@ class DownstreamAnalyzer(Representative):
                 and node.id == name
             ):
                 node_scope = self.context.scope.resolve(node)
-                definitions = node_scope.get_definitions(name) or []
+                definitions = node_scope.get_definitions(name)
                 if any(definition is source for definition in definitions):
                     yield node
 
@@ -755,6 +756,80 @@ class AssertEncoder(Rule):
         return Replace(test, encrypt_call)
 
 
+class Usages(Representative):
+    context_providers = (Scope,)
+
+    def find(self, name: str, needle: ast.AST) -> Iterator[ast.AST]:
+        """Iterate all possible usage sites of ``name``."""
+        for node in ast.walk(self.context.tree):
+            if isinstance(node, ast.Name) and node.id == name:
+                scope = self.context.scope.resolve(node)
+                if needle in scope.get_definitions(name):
+                    yield node
+
+
+class PropagateAndDelete(Rule):
+    context_providers = (Usages,)
+
+    INPUT_SOURCE = """
+        import ast
+        import foo
+        def traverse():
+            import bar
+            for node in ast.walk(ast.parse("1 + 2")):
+                dump(node, bar.loads())
+
+        def dump(node, loaded):
+            import zoo
+            zoo.check(loaded)
+            print(ast.dump(node))
+
+        def no():
+            ast = 1
+            print(ast)
+
+        class T(ast.NodeTransformer):
+            traverse()
+    """
+
+    EXPECTED_SOURCE = """
+    def traverse():
+        for node in __import__('ast').walk(__import__('ast').parse("1 + 2")):
+            dump(node, __import__('bar').loads())
+
+    def dump(node, loaded):
+        __import__('zoo').check(loaded)
+        print(__import__('ast').dump(node))
+
+    def no():
+        ast = 1
+        print(ast)
+
+    class T(__import__('ast').NodeTransformer):
+        traverse()
+    """
+
+    def match(self, node: ast.AST) -> Iterator[BaseAction]:
+        # Check if this is a single import with no alias.
+        assert isinstance(node, ast.Import)
+        assert len(node.names) == 1
+
+        [name] = node.names
+        assert name.asname is None
+
+        # Replace each usage of this module with its own __import__() call.
+        import_call = ast.Call(
+            func=ast.Name("__import__"),
+            args=[ast.Constant(name.name)],
+            keywords=[],
+        )
+        for usage in self.context.usages.find(name.name, node):
+            yield Replace(usage, import_call)
+
+        # And finally remove the import itself
+        yield Erase(node)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -768,6 +843,7 @@ class AssertEncoder(Rule):
         RemoveDeadCode,
         RenameImportAndDownstream,
         AssertEncoder,
+        PropagateAndDelete,
     ],
 )
 def test_complete_rules(rule, tmp_path):
