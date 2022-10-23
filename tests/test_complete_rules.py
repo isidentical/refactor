@@ -12,6 +12,7 @@ from refactor import BaseAction, Rule, Session, common, context
 from refactor.actions import (
     Erase,
     EraseOrReplace,
+    InsertAfter,
     LazyInsertAfter,
     LazyReplace,
     Replace,
@@ -871,6 +872,80 @@ class FoldMyConstants(Rule):
         return Replace(node, result)
 
 
+class AtomicTryBlock(Rule):
+    INPUT_SOURCE = """
+    def generate_index(base_path, active_path):
+        module_index = defaultdict(dict)
+        for base_file in base_path.glob("**/*.py"):
+            file_name = str(base_file.relative_to(base_path))
+            active_file = active_path / file_name
+            module_name = file_name.replace('/', '.').removesuffix('.py')
+            if 'test.' in module_name or '.tests' in module_name or 'encoding' in module_name or 'idle_test' in module_name:
+                continue
+
+            try:
+                base_tree = get_tree(base_file, module_name)
+                active_tree = get_tree(active_file, module_name)
+                third_tree = get_tree(third_tree, module_name)
+            except (SyntaxError, FileNotFoundError):
+                continue
+
+            print('processing ', module_name)
+            try:
+                base_tree = get_tree(base_file, module_name)
+                active_tree = get_tree(active_file, module_name)
+            except (SyntaxError, FileNotFoundError):
+                continue"""
+
+    EXPECTED_SOURCE = """
+    def generate_index(base_path, active_path):
+        module_index = defaultdict(dict)
+        for base_file in base_path.glob("**/*.py"):
+            file_name = str(base_file.relative_to(base_path))
+            active_file = active_path / file_name
+            module_name = file_name.replace('/', '.').removesuffix('.py')
+            if 'test.' in module_name or '.tests' in module_name or 'encoding' in module_name or 'idle_test' in module_name:
+                continue
+
+            try:
+                base_tree = get_tree(base_file, module_name)
+            except (SyntaxError, FileNotFoundError):
+                continue
+            try:
+                active_tree = get_tree(active_file, module_name)
+            except (SyntaxError, FileNotFoundError):
+                continue
+            try:
+                third_tree = get_tree(third_tree, module_name)
+            except (SyntaxError, FileNotFoundError):
+                continue
+
+            print('processing ', module_name)
+            try:
+                base_tree = get_tree(base_file, module_name)
+            except (SyntaxError, FileNotFoundError):
+                continue
+            try:
+                active_tree = get_tree(active_file, module_name)
+            except (SyntaxError, FileNotFoundError):
+                continue"""
+
+    def match(self, node: ast.AST) -> Iterator[Union[Replace, InsertAfter]]:
+        assert isinstance(node, ast.Try)
+        assert len(node.body) >= 2
+
+        new_trys = []
+        for stmt in node.body:
+            new_try = common.clone(node)
+            new_try.body = [stmt]
+            new_trys.append(new_try)
+
+        first_try, *remaining_trys = new_trys
+        yield Replace(node, first_try)
+        for remaining_try in reversed(remaining_trys):
+            yield InsertAfter(node, remaining_try)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -886,6 +961,7 @@ class FoldMyConstants(Rule):
         AssertEncoder,
         PropagateAndDelete,
         FoldMyConstants,
+        AtomicTryBlock,
     ],
 )
 def test_complete_rules(rule, tmp_path):

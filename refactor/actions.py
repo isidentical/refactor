@@ -181,14 +181,20 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
             lines[self.node.lineno - 1][: self.node.col_offset]
         )
 
-        replacement = split_lines(
-            context.unparse(self.build()) + lines._newline_type
-        )
+        replacement = split_lines(context.unparse(self.build()))
         replacement.apply_indentation(indentation, start_prefix=start_prefix)
 
-        end_line = cast(int, self.node.end_lineno)
+        original_node_end = cast(int, self.node.end_lineno) - 1
+        if lines[original_node_end].endswith(lines._newline_type):
+            replacement[-1] += lines._newline_type
+        else:
+            # If the original anchor's last line doesn't end with a newline,
+            # then we need to also prevent our new source from ending with
+            # a newline.
+            replacement[0] = lines._newline_type + replacement[0]
+
         for line in reversed(replacement):
-            lines.insert(end_line, line)
+            lines.insert(original_node_end + 1, line)
 
         return lines.join()
 
