@@ -3,6 +3,7 @@
 :maxdepth: 1
 
 installation
+playground
 ```
 
 ```{toctree}
@@ -38,6 +39,7 @@ contributing
 
 [![PyPI version](https://badge.fury.io/py/refactor.svg)](https://badge.fury.io/py/refactor)
 [![Documentation](https://img.shields.io/badge/%3D%3E-Documentation-brightgreen)](https://refactor.readthedocs.io)
+[![Try It](https://img.shields.io/badge/Try%20It-getrefactor.com-green?style=for-the-badge)](https://getrefactor.com)
 
 Simple, hassle-free, dependency-free, AST based fragmental source code refactoring
 and transformation toolkit.

@@ -1,8 +1,15 @@
 # Changelog
 
+## 0.6.2
+
+- Augmented and annotated assignments now counted towards definitions when analyzing the scope.
+- `refactor.actions.InsertAfter` now preserves the final line state (e.g. if the anchor doesn't end with a newline, it also will produce code that won't be ending with a newline).
+- [`getrefactor.com`](https://getrefactor.com) is now available.
+
 ## 0.6.1
 
 - Added support for WASM.
+- Multiline replacements that cover different column offsets are now supported.
 
 ## 0.6.0
 
