@@ -299,6 +299,14 @@ class ScopeInfo(common._Singleton):
                 for target in node.targets:
                     for identifier in common.unpack_lhs(target):
                         local_definitions[identifier].append(node)
+            elif isinstance(node, ast.AnnAssign) and node.value:
+                # a: int = 1
+                for identifier in common.unpack_lhs(node.target):
+                    local_definitions[identifier].append(node)
+            elif isinstance(node, ast.AugAssign):
+                # a += 1
+                for identifier in common.unpack_lhs(node.target):
+                    local_definitions[identifier].append(node)
             elif isinstance(node, ast.NamedExpr):
                 # (a := b)
                 local_definitions[node.target.id].append(node)

@@ -471,6 +471,9 @@ class RemoveDeadCode(Rule):
     CONSTANT_3 = 1
     CONSTANT_4 = 0
     CONSTANT_5 = uninferrable()
+    CONSTANT_6 = False
+    CONSTANT_6 += 0
+    CONSTANT_7: bool = False
     if CONSTANT_1:
         pass
     if CONSTANT_2:
@@ -523,6 +526,9 @@ class RemoveDeadCode(Rule):
         b = 2
         if CONSTANT_2:
             pass
+    if CONSTANT_6:
+        if CONSTANT_7:
+            pass
     """
 
     EXPECTED_SOURCE = """
@@ -531,6 +537,9 @@ class RemoveDeadCode(Rule):
         CONSTANT_3 = 1
         CONSTANT_4 = 0
         CONSTANT_5 = uninferrable()
+        CONSTANT_6 = False
+        CONSTANT_6 += 0
+        CONSTANT_7: bool = False
         if CONSTANT_1:
             pass
         if CONSTANT_3:
@@ -564,6 +573,8 @@ class RemoveDeadCode(Rule):
             a = 1
         else:
             b = 2
+        if CONSTANT_6:
+            pass
     """
 
     def match(self, node: ast.AST) -> Optional[EraseOrReplace]:
@@ -575,7 +586,7 @@ class RemoveDeadCode(Rule):
             node_scope = self.context.scope.resolve(node)
             definitions = node_scope.get_definitions(node.test.id)
             assert len(definitions) == 1 and isinstance(
-                definition := definitions[0], ast.Assign
+                definition := definitions[0], (ast.Assign, ast.AnnAssign)
             )
             assert isinstance(definition.value, ast.Constant)
             static_condition = definition.value
