@@ -830,6 +830,36 @@ class PropagateAndDelete(Rule):
         yield Erase(node)
 
 
+class FoldMyConstants(Rule):
+    INPUT_SOURCE = """
+    result = (
+        1 * 2 + (5 + 3) # A very complex math equation
+    ) + 8 # Don't forget the 8 here
+    """
+
+    EXPECTED_SOURCE = """
+    result = 18 # Don't forget the 8 here
+    """
+
+    def match(self, node: ast.AST) -> Replace:
+        # Look for an arithmetic addition or subtraction
+        assert isinstance(node, ast.BinOp)
+        assert isinstance(op := node.op, (ast.Add, ast.Sub, ast.Mult))
+
+        # Where both left and right are constants
+        assert isinstance(left := node.left, ast.Constant)
+        assert isinstance(right := node.right, ast.Constant)
+
+        # And then replace it with the result of the computation
+        if isinstance(op, ast.Add):
+            result = ast.Constant(left.value + right.value)
+        elif isinstance(op, ast.Mult):
+            result = ast.Constant(left.value * right.value)
+        else:
+            result = ast.Constant(left.value - right.value)
+        return Replace(node, result)
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -844,6 +874,7 @@ class PropagateAndDelete(Rule):
         RenameImportAndDownstream,
         AssertEncoder,
         PropagateAndDelete,
+        FoldMyConstants,
     ],
 )
 def test_complete_rules(rule, tmp_path):

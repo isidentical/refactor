@@ -1,7 +1,6 @@
 import os
 from argparse import ArgumentParser
 from collections import defaultdict
-from concurrent.futures import ProcessPoolExecutor, as_completed
 from contextlib import nullcontext
 from functools import partial
 from itertools import chain
@@ -19,6 +18,13 @@ from typing import (
 from refactor.core import Session
 
 _DEFAULT_WORKERS = object()
+
+try:
+    from concurrent.futures import ProcessPoolExecutor, as_completed
+except ImportError:
+    NO_PROCESSING = True
+else:
+    NO_PROCESSING = False
 
 
 def expand_paths(path: Path) -> Iterable[Path]:
@@ -68,7 +74,12 @@ def run_files(
     workers = _determine_workers(workers, session.config.debug_mode)
 
     executor: ContextManager[Any]
-    if workers == 1:
+    if workers == 1 or NO_PROCESSING:
+        if workers > 1:
+            print(
+                "WARNING: multiprocessing is not available, so using the"
+                " sequential execution"
+            )
         executor = nullcontext()
         changes = (session.run_file(file) for file in files)
     else:

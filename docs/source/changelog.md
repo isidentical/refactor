@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.6.1
+
+- Added support for WASM.
+
 ## 0.6.0
 
 ### Major

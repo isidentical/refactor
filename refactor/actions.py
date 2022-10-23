@@ -96,9 +96,8 @@ class _ReplaceCodeSegmentAction(BaseAction):
         view = slice(lineno - 1, end_lineno)
         source_lines = lines[view]
 
-        indentation, start_prefix = find_indent(source_lines[-1][:col_offset])
+        indentation, start_prefix = find_indent(source_lines[0][:col_offset])
         end_suffix = source_lines[-1][end_col_offset:]
-
         replacement = split_lines(self._resynthesize(context))
         replacement.apply_indentation(
             indentation, start_prefix=start_prefix, end_suffix=end_suffix
