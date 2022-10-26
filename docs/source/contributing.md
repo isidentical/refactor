@@ -13,11 +13,11 @@ $ cd refactor
 $ git remote add upstream https://github.com/isidentical/refactor.git
 ```
 
-Create a branch from a fresh version of `upstream/master`:
+Create a branch from a fresh version of `upstream/main`:
 
 ```console
 $ git fetch upstream
-$ git checkout -b <your branch name> upstream/master
+$ git checkout -b <your branch name> upstream/main
 ```
 
 Install `pre-commit` and other dev dependencies locally and don't forget to enable the hooks for this repository:

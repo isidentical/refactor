@@ -436,5 +436,5 @@ As you can see, this is where the main difference comes from.
 ::::
 
 ```{note}
-The full code for this example is available at our [GitHub repo](https://github.com/isidentical/refactor/tree/master/examples/tutorial/constant-folding)
+The full code for this example is available at our [GitHub repo](https://github.com/isidentical/refactor/tree/main/examples/tutorial/constant-folding)
 ```

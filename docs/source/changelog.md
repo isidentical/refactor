@@ -89,7 +89,7 @@ actions can be seen here:
 
 For migrating your code base to the new style actions, we wrote a small tool
 (that we also used internally),
-[examples/deprecated_aliases.py](https://github.com/isidentical/refactor/blob/master/examples/deprecated_aliases.py).
+[examples/deprecated_aliases.py](https://github.com/isidentical/refactor/blob/main/examples/deprecated_aliases.py).
 Feel free to try it, and let us know if the transition was seamless.
 
 ### Other Changes
