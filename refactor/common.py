@@ -57,7 +57,7 @@ def negate(node: ast.expr) -> ast.UnaryOp:
 
 def apply_condition(condition: bool, node: ast.expr) -> ast.expr:
     """Negate the given ``node`` if the given ``condition`` is
-    a falsy value."""
+    a non-truthy value."""
     if condition:
         return node
     else:
