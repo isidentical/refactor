@@ -1,15 +1,7 @@
-# See https://pre-commit.com for more information
-# See https://pre-commit.com/hooks.html for more hooks
-
-ci:
-    autofix_prs: false
-
-default_language_version:
-    python: python3.9
-
-exclude: '^examples/legacy/type_literals.py'
-
 repos:
+-   repo: meta
+    hooks:
+      - id: check-hooks-apply
 -   repo: local
     hooks:
       - id: refactor
@@ -17,6 +9,13 @@ repos:
         language: system
         entry: refactor
         types: [python]
+-   repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.3.0
+    hooks:
+    -   id: check-added-large-files
+    -   id: check-merge-conflict
+    -   id: check-vcs-permalinks
+    -   id: debug-statements
 -   repo: https://github.com/psf/black
     rev: 22.10.0
     hooks:
@@ -29,30 +28,19 @@ repos:
     rev: v2.2.0
     hooks:
     -   id: setup-cfg-fmt
+        args:
+        -    --include-version-classifiers
 -   repo: https://github.com/pre-commit/mirrors-mypy
     rev: 'v0.982'
     hooks:
       -  id: mypy
-         args:
-         -   --disallow-incomplete-defs
-         -   --ignore-missing-imports
-         -   --no-warn-no-return
-         -   --disable-error-code
-         -   attr-defined
 -   repo: https://github.com/hakancelikdev/unimport
     rev: 0.12.1
     hooks:
       - id: unimport
         args:
-        -   --remove
-        -   --ignore-init
-# -   repo: https://github.com/executablebooks/mdformat/
-#     rev: 0.7.14
-#     hooks:
-#     -   id: mdformat
-#         additional_dependencies:
-#         - mdformat_tables
-#         - mdformat-black
+        -   --config
+        -   setup.cfg
 -   repo: https://github.com/codespell-project/codespell
     rev: v2.2.2
     hooks:
