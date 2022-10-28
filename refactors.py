@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import ast
 from pathlib import Path
-from typing import Optional
 
 import refactor
 from refactor import InsertAfter, Replace
@@ -12,7 +11,7 @@ from refactor.context import Scope
 class RefactorAsserts(refactor.Rule):
     FILES = frozenset(["refactor/common.py"])
 
-    def check_file(self, file: Optional[Path]) -> bool:
+    def check_file(self, file: Path | None) -> bool:
         return str(file) in self.FILES
 
     def match(self, node: ast.AST) -> Replace:
@@ -47,10 +46,10 @@ class ProcessDeprecationHints(refactor.Rule):
     FILES = frozenset(["refactor/actions.py"])
     context_providers = (Scope,)
 
-    def check_file(self, file: Optional[Path]) -> bool:
+    def check_file(self, file: Path | None) -> bool:
         return str(file) in self.FILES
 
-    def match(self, node: ast.AST) -> Optional[InsertAfter]:
+    def match(self, node: ast.AST) -> InsertAfter | None:
         assert isinstance(node, ast.ClassDef)
         assert _is_hinted_with(node, "deprecated_alias")
 

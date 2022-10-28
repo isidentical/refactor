@@ -73,7 +73,7 @@ def test_is_contextful(node, expected):
 @pytest.mark.parametrize(
     "original, expected",
     [
-        (str(), str()),
+        ("", ""),
         ("rule", "rule"),
         ("Rule", "rule"),
         ("SomeRule", "some_rule"),
@@ -87,8 +87,8 @@ def test_pascal_to_snake(original, expected):
 @pytest.mark.parametrize(
     "original, indent, prefix",
     [
-        (str(), str(), str()),
-        (" ", " ", str()),
+        ("", "", ""),
+        (" ", " ", ""),
         ("x", "", "x"),
         (" x", " ", "x"),
         ("  x", "  ", "x"),

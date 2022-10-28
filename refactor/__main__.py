@@ -3,16 +3,16 @@ from __future__ import annotations
 import importlib
 import importlib.util
 from argparse import ArgumentParser
+from collections.abc import Iterable
 from itertools import chain
 from pathlib import Path
-from typing import Iterable, Type
 
 from refactor.core import Rule, Session
 from refactor.runner import expand_paths, run_files
 from refactor.validate_inputs import validate_main_inputs
 
 
-def get_refactors(path: Path) -> Iterable[Type[Rule]]:
+def get_refactors(path: Path) -> Iterable[type[Rule]]:
     spec = importlib.util.spec_from_file_location(path.stem, path)
     assert spec is not None
 

@@ -2,26 +2,12 @@ from __future__ import annotations
 
 import ast
 from collections import defaultdict, deque
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 from functools import cached_property
 from pathlib import Path
-from typing import (
-    Any,
-    ClassVar,
-    DefaultDict,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Protocol,
-    Set,
-    Tuple,
-    Type,
-    Union,
-    cast,
-)
+from typing import Any, ClassVar, DefaultDict, Protocol, cast
 
 import refactor.common as common
 from refactor.ast import UNPARSER_BACKENDS, BaseUnparser
@@ -35,21 +21,21 @@ class Configuration:
     debug_mode: whether to output more debug information.
     """
 
-    unparser: Union[str, Type[BaseUnparser]] = "precise"
+    unparser: str | type[BaseUnparser] = "precise"
     debug_mode: bool = False
 
 
 class _Dependable(Protocol):
-    context_providers: ClassVar[Tuple[Type[Representative], ...]]
+    context_providers: ClassVar[tuple[type[Representative], ...]]
 
     def __init__(self, context: Context) -> None:
         ...
 
 
 def _resolve_dependencies(
-    dependables: Iterable[Type[_Dependable]],
-) -> Set[Type[Representative]]:
-    dependencies: Set[Type[Representative]] = set()
+    dependables: Iterable[type[_Dependable]],
+) -> set[type[Representative]]:
+    dependencies: set[type[Representative]] = set()
 
     pool = deque(dependables)
     while pool:
@@ -61,7 +47,7 @@ def _resolve_dependencies(
         )
 
         if issubclass(dependable, Representative):
-            dependencies.add(cast(Type[Representative], dependable))
+            dependencies.add(cast(type[Representative], dependable))
 
     return dependencies
 
@@ -77,21 +63,21 @@ class Context:
 
     file_info: common._FileInfo = field(default_factory=common._FileInfo)
     config: Configuration = field(default_factory=Configuration)
-    metadata: Dict[str, Representative] = field(default_factory=dict)
+    metadata: dict[str, Representative] = field(default_factory=dict)
 
     ancestry: Ancestry = field(init=False)
     scope: Scope = field(init=False)
 
     @classmethod
     def _from_dependencies(
-        cls, dependencies: Iterable[Type[Representative]], **kwargs: Any
+        cls, dependencies: Iterable[type[Representative]], **kwargs: Any
     ) -> Context:
         context = cls(**kwargs)
         context._import_dependencies(dependencies)
         return context
 
     def _import_dependencies(
-        self, representatives: Iterable[Type[Representative]]
+        self, representatives: Iterable[type[Representative]]
     ) -> None:
         for raw_representative in representatives:
             representative = raw_representative(self)
@@ -150,7 +136,7 @@ class Context:
         return new_cls
 
     @property
-    def file(self) -> Optional[Path]:
+    def file(self) -> Path | None:
         return self.file_info.path
 
 
@@ -158,7 +144,7 @@ class Context:
 class Representative:
     """A tree-scoped metadata collector."""
 
-    context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
+    context_providers: ClassVar[tuple[type[Representative], ...]] = ()
 
     context: Context
 
@@ -206,14 +192,14 @@ class Ancestry(Representative):
     def _ensure_annotated(self) -> None:
         self._annotate(self.context.tree)
 
-    def infer(self, node: ast.AST) -> Tuple[Optional[str], Optional[ast.AST]]:
+    def infer(self, node: ast.AST) -> tuple[str | None, ast.AST | None]:
         """Return the given `node`'s parent field (the field
         name in parent which this node is stored in) and the
         parent."""
         self._ensure_annotated()
         return (node.parent_field, node.parent)
 
-    def traverse(self, node: ast.AST) -> Iterable[Tuple[str, ast.AST]]:
+    def traverse(self, node: ast.AST) -> Iterable[tuple[str, ast.AST]]:
         """Recursively infer a `node`'s parent field and parent."""
         cursor = node
         while True:
@@ -224,7 +210,7 @@ class Ancestry(Representative):
             yield cast(str, field), cast(ast.AST, parent)
             cursor = parent
 
-    def get_parent(self, node: ast.AST) -> Optional[ast.AST]:
+    def get_parent(self, node: ast.AST) -> ast.AST | None:
         """Return the parent AST node of the given `node`."""
         _, parent = self.infer(node)
         return parent
@@ -246,7 +232,7 @@ class ScopeType(Enum):
 class ScopeInfo(common._Singleton):
     node: ast.AST
     scope_type: ScopeType
-    parent: Optional[ScopeInfo] = field(default=None, repr=False)
+    parent: ScopeInfo | None = field(default=None, repr=False)
 
     def _iter_reachable_scopes(self) -> Iterator[ScopeInfo]:
         yield self
@@ -267,7 +253,7 @@ class ScopeInfo(common._Singleton):
         else:
             return False
 
-    def get_definitions(self, name: str) -> List[ast.AST]:
+    def get_definitions(self, name: str) -> list[ast.AST]:
         """Return all the definitions of the given `name` that
         this scope can reach. Returns an empty list if there is None."""
         for reachable_scope in self._iter_reachable_scopes():
@@ -281,14 +267,14 @@ class ScopeInfo(common._Singleton):
         return name in self.definitions
 
     @cached_property
-    def definitions(self) -> Dict[str, List[ast.AST]]:
+    def definitions(self) -> dict[str, list[ast.AST]]:
         """Return all the definitions made inside this scope.
 
         .. note::
             It doesn't include definitions made in child scopes.
         """
 
-        local_definitions: DefaultDict[str, List[ast.AST]] = defaultdict(list)
+        local_definitions: DefaultDict[str, list[ast.AST]] = defaultdict(list)
         for node in common.walk_scope(self.node):
             if isinstance(node, ast.Assign):
                 # a, b = c = 1

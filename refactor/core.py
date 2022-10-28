@@ -3,20 +3,11 @@ from __future__ import annotations
 import ast
 import tempfile
 import tokenize
+from collections.abc import Iterator
 from contextlib import suppress
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import (
-    ClassVar,
-    FrozenSet,
-    Iterator,
-    List,
-    NoReturn,
-    Optional,
-    Tuple,
-    Type,
-    Union,
-)
+from typing import ClassVar, NoReturn
 
 # TODO: remove the deprecated aliases on 1.0.0
 from refactor.actions import (  # unimport:skip
@@ -43,11 +34,11 @@ class MaybeOverlappingActions(Exception):
 
 @dataclass
 class Rule:
-    context_providers: ClassVar[Tuple[Type[Representative], ...]] = ()
+    context_providers: ClassVar[tuple[type[Representative], ...]] = ()
 
     context: Context
 
-    def check_file(self, path: Optional[Path]) -> bool:
+    def check_file(self, path: Path | None) -> bool:
         """Check whether to process the given ``path``. If ``path`` is `None`,
         that means the user has submitted a string to be processed.
 
@@ -59,7 +50,7 @@ class Rule:
     def match(
         self,
         node: ast.AST,
-    ) -> Union[Optional[BaseAction], Iterator[BaseAction]]:
+    ) -> BaseAction | None | Iterator[BaseAction]:
         """Match the given ``node`` against current rule's scope.
 
         On success, it will return a source code transformation action
@@ -73,7 +64,7 @@ class Rule:
 class Session:
     """A refactoring session that consists of a set of rules and a configuration."""
 
-    rules: List[Type[Rule]] = field(default_factory=list)
+    rules: list[type[Rule]] = field(default_factory=list)
     config: Configuration = field(default_factory=Configuration)
 
     def _initialize_rules(
@@ -81,7 +72,7 @@ class Session:
         tree: ast.Module,
         source: str,
         file_info: _FileInfo,
-    ) -> List[Rule]:
+    ) -> list[Rule]:
         context = Context._from_dependencies(
             _resolve_dependencies(self.rules),
             tree=tree,
@@ -121,7 +112,7 @@ class Session:
 
         from refactor.internal.graph_access import AccessFailure, GraphPath
 
-        shifts: List[Tuple[GraphPath, int]] = []
+        shifts: list[tuple[GraphPath, int]] = []
         previous_tree = rule.context.tree
         for action in actions:
             input_node, stack_effect = action._stack_effect()
@@ -174,8 +165,8 @@ class Session:
         file_info: _FileInfo,
         *,
         _changed: bool = False,
-        _known_sources: FrozenSet[str] = frozenset(),
-    ) -> Tuple[str, bool]:
+        _known_sources: frozenset[str] = frozenset(),
+    ) -> tuple[str, bool]:
         try:
             tree = ast.parse(source)
         except SyntaxError as exc:
@@ -237,7 +228,7 @@ class Session:
         source, _ = self._run(source, file_info=_FileInfo())
         return source
 
-    def run_file(self, file: Path) -> Optional[Change]:
+    def run_file(self, file: Path) -> Change | None:
         """Apply all the rules from this session to the given ``file``
         and return a :class:`refactor.Change` if any changes were made.
 

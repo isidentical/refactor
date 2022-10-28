@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import ast
+from collections.abc import Iterator
 from contextlib import suppress
-from typing import Callable, Iterator, List, Optional
+from typing import Callable, Optional
 
 from refactor import common
 from refactor.actions import BaseAction, Replace, _Rename
@@ -17,7 +18,7 @@ from refactor.internal.position_provider import infer_identifier_position
 
 OptimizerType = Callable[[BaseAction, Context], Optional[BaseAction]]
 
-_OPTIMIZATIONS: List[OptimizerType] = []
+_OPTIMIZATIONS: list[OptimizerType] = []
 
 is_named_node = common._type_checker(
     ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef
@@ -52,7 +53,7 @@ def expect_changes(
 
 @register_optimizer
 @common._guarded(IncompleteASTError)
-def rename_optimizer(action: BaseAction, context: Context) -> Optional[BaseAction]:
+def rename_optimizer(action: BaseAction, context: Context) -> BaseAction | None:
     assert isinstance(action, Replace)
     assert is_named_node(action.node) and is_named_node(action.target)
     assert action.node.name != action.target.name

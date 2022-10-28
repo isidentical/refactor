@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field, replace
-from typing import Any, Generic, List, Tuple, Type, TypeVar, Union
+from typing import Any, Generic, TypeVar, Union
 
 from refactor import common
 from refactor.context import Context
@@ -19,7 +19,7 @@ class AccessFailure(Exception):
 class Access(Generic[InputType, OutputType]):
     """Represents a generic access on a node's field."""
 
-    expected_type: Type[Any]
+    expected_type: type[Any]
 
     def __repr__(self) -> str:
         raise NotImplementedError
@@ -35,7 +35,7 @@ class Access(Generic[InputType, OutputType]):
 
 
 @dataclass
-class FieldAccess(Access[ast.AST, Union[ast.AST, List[ast.AST]]]):
+class FieldAccess(Access[ast.AST, Union[ast.AST, list[ast.AST]]]):
     """A single-node field access."""
 
     field: str
@@ -43,14 +43,14 @@ class FieldAccess(Access[ast.AST, Union[ast.AST, List[ast.AST]]]):
     def __repr__(self):
         return f".{self.field}"
 
-    def execute(self, input: ast.AST) -> Union[ast.AST, List[ast.AST]]:
+    def execute(self, input: ast.AST) -> ast.AST | list[ast.AST]:
         accessed_node = getattr(input, self.field)
         self._check(type(accessed_node) is self.expected_type)
         return accessed_node
 
 
 @dataclass
-class IndexAccess(Access[List[ast.AST], ast.AST]):
+class IndexAccess(Access[list[ast.AST], ast.AST]):
     """Access to a sequence of nodes by an index."""
 
     index: int
@@ -58,7 +58,7 @@ class IndexAccess(Access[List[ast.AST], ast.AST]):
     def __repr__(self):
         return f"[{self.index}]"
 
-    def execute(self, input: List[ast.AST]) -> ast.AST:
+    def execute(self, input: list[ast.AST]) -> ast.AST:
         self._check(isinstance(input, list))
         self._check(len(input) > self.index)
         accessed_node = input[self.index]
@@ -68,7 +68,7 @@ class IndexAccess(Access[List[ast.AST], ast.AST]):
 
 @dataclass
 class GraphPath:
-    parts: List[Access] = field(default_factory=list)
+    parts: list[Access] = field(default_factory=list)
 
     @classmethod
     def backtrack_from(cls, context: Context, node: ast.AST) -> GraphPath:
@@ -83,7 +83,7 @@ class GraphPath:
         the path for the '1' would be: .body[0].body[1].value
         """
 
-        parts: List[Access] = []
+        parts: list[Access] = []
         cursor = node
         for ancestor_field, ancestor in context.ancestry.traverse(node):
             ancestor_field_value = getattr(ancestor, ancestor_field)
@@ -106,7 +106,7 @@ class GraphPath:
         return GraphPath(parts)
 
     @common._allow_asserts
-    def shift(self, shifts: List[Tuple[GraphPath, int]]) -> GraphPath:
+    def shift(self, shifts: list[tuple[GraphPath, int]]) -> GraphPath:
         """Apply the offsets from the preceding operations on this path. The offsets
         must be shifted as well.
 

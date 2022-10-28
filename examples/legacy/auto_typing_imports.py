@@ -3,14 +3,13 @@ from __future__ import annotations
 import ast
 import typing
 from dataclasses import dataclass
-from typing import Dict, List
 
 import refactor
 from refactor import common, context
 
 
 class ImportFinder(refactor.Representative):
-    def collect(self, name: str, scope: context.ScopeInfo) -> Dict[str, ast.ImportFrom]:
+    def collect(self, name: str, scope: context.ScopeInfo) -> dict[str, ast.ImportFrom]:
         import_statents = [
             node
             for node in ast.walk(self.context.tree)
@@ -30,7 +29,7 @@ class ImportFinder(refactor.Representative):
 @dataclass
 class AddNewImport(refactor.LazyInsertAfter):
     module: str
-    names: List[str]
+    names: list[str]
 
     def build(self) -> ast.stmt:
         return ast.ImportFrom(

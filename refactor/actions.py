@@ -4,7 +4,7 @@ import ast
 import warnings
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
-from typing import Generic, Tuple, TypeVar, cast
+from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
 from refactor.common import PositionType, _hint, clone, find_indent, position_for
@@ -39,7 +39,7 @@ class BaseAction:
         version."""
         raise NotImplementedError
 
-    def _stack_effect(self) -> Tuple[ast.AST, int]:
+    def _stack_effect(self) -> tuple[ast.AST, int]:
         """Return the stack effect of this action (relative to the node it returns.)"""
         raise NotImplementedError("This action can't be chained, yet.")
 
@@ -124,7 +124,7 @@ class LazyReplace(_ReplaceCodeSegmentAction, _LazyActionMixin[ast.AST, ast.AST])
     def _resynthesize(self, context: Context) -> str:
         return context.unparse(self.build())
 
-    def _stack_effect(self) -> Tuple[ast.AST, int]:
+    def _stack_effect(self) -> tuple[ast.AST, int]:
         # Replacing a statement with another one won't cause any shifts
         # in the block.
         return (self.node, 0)
@@ -189,7 +189,7 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
 
         return lines.join()
 
-    def _stack_effect(self) -> Tuple[ast.AST, int]:
+    def _stack_effect(self) -> tuple[ast.AST, int]:
         # Adding a statement right after the node will need to be reflected
         # in the block.
         return (self.node, 1)
@@ -271,7 +271,7 @@ class Erase(_ReplaceCodeSegmentAction):
         else:
             return ""
 
-    def _stack_effect(self) -> Tuple[ast.AST, int]:
+    def _stack_effect(self) -> tuple[ast.AST, int]:
         # Erasing a single node mean positions of all the followinng statements will
         # need to reduced by 1.
         return (self.node, -1)
@@ -295,5 +295,5 @@ class EraseOrReplace(Erase):
         else:
             return ""
 
-    def _stack_effect(self) -> Tuple[ast.AST, int]:
+    def _stack_effect(self) -> tuple[ast.AST, int]:
         raise NotImplementedError("EraseOrReplace doesn't support chained actions.")

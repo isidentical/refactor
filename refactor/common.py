@@ -3,30 +3,18 @@ from __future__ import annotations
 import ast
 import copy
 from collections import deque
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import cache, singledispatch, wraps
 from pathlib import Path
-from typing import (
-    TYPE_CHECKING,
-    Any,
-    Callable,
-    Dict,
-    Iterable,
-    Iterator,
-    List,
-    Optional,
-    Tuple,
-    Type,
-    TypeVar,
-    cast,
-)
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
 
 if TYPE_CHECKING:
     from refactor.context import Context
 
 T = TypeVar("T")
 C = TypeVar("C")
-PositionType = Tuple[int, int, int, int]
+PositionType = tuple[int, int, int, int]
 
 
 @dataclass
@@ -34,8 +22,8 @@ class _FileInfo:
     """Represents information regarding the source code (the
     file it was read from, the encoding, etc.)"""
 
-    path: Optional[Path] = None
-    encoding: Optional[str] = None
+    path: Path | None = None
+    encoding: str | None = None
 
     def get_encoding(self) -> str:
         """Return the encoding for this file (if it doesn't exist,
@@ -79,7 +67,7 @@ _OPERATOR_MAP = {
 }
 
 
-def is_truthy(op: ast.cmpop) -> Optional[bool]:
+def is_truthy(op: ast.cmpop) -> bool | None:
     """Return `True` for truth-based comparison
     operators (e.g `==`, `is`, `in`), `False` for
     falsity-based operators (e.g `!=`, `is not`, `not in`)
@@ -88,12 +76,12 @@ def is_truthy(op: ast.cmpop) -> Optional[bool]:
 
 
 def _type_checker(
-    *types: Type, binders: Iterable[Callable[[Type], bool]] = ()
+    *types: type, binders: Iterable[Callable[[type], bool]] = ()
 ) -> Callable[[Any], bool]:
     binders = [getattr(binder, "fast_checker", binder) for binder in binders]
 
     @cache
-    def checker(node_type: Type) -> bool:
+    def checker(node_type: type) -> bool:
         result = issubclass(node_type, types)
         return result or any(binder(node_type) for binder in binders)
 
@@ -119,7 +107,7 @@ def compare_ast(left: ast.AST, right: ast.AST, /) -> bool:
     return ast.dump(left) == ast.dump(right)
 
 
-def _guarded(exc_type: Type[BaseException], /, default: Any = None) -> Any:
+def _guarded(exc_type: type[BaseException], /, default: Any = None) -> Any:
     def outer(func):
         @wraps(func)
         def inner(*args, **kwargs):
@@ -133,9 +121,7 @@ def _guarded(exc_type: Type[BaseException], /, default: Any = None) -> Any:
     return outer
 
 
-def _get_known_location_from_source(
-    source: str, location: PositionType
-) -> Optional[str]:
+def _get_known_location_from_source(source: str, location: PositionType) -> str | None:
     start_line, start_col, end_line, end_col = location
     # Python AST line numbers are 1-indexed
     start_line -= 1
@@ -154,7 +140,7 @@ def _get_known_location_from_source(
 
 
 @_guarded(Exception)
-def get_source_segment(source: str, node: ast.AST) -> Optional[str]:
+def get_source_segment(source: str, node: ast.AST) -> str | None:
     """Faster (and less-precise) implementation of
     ast.get_source_segment"""
 
@@ -170,7 +156,7 @@ def pascal_to_snake(name: str) -> str:
     """Convert the given ``name`` from pascal case to
     snake case."""
 
-    new_string = str()
+    new_string = ""
     for is_tail, part in enumerate(name):
         if is_tail and part.isupper():
             new_string += "_"
@@ -179,7 +165,7 @@ def pascal_to_snake(name: str) -> str:
     return new_string.lower()
 
 
-def find_indent(source: str) -> Tuple[str, str]:
+def find_indent(source: str) -> tuple[str, str]:
     """Split the given line into the current indentation
     and the remaining characters."""
     index = 0
@@ -198,7 +184,7 @@ def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
 
     node_positions = position_for(node)
 
-    def closest(target: ast.AST) -> Tuple[int, ...]:
+    def closest(target: ast.AST) -> tuple[int, ...]:
         target_positions = position_for(target)
         return tuple(
             abs(target_position - node_position)
@@ -225,7 +211,7 @@ _POSITIONAL_ATTRIBUTES_SET = frozenset(_POSITIONAL_ATTRIBUTES)
 
 
 @cache  # type: ignore
-def has_positions(node_type: Type[ast.AST]) -> bool:
+def has_positions(node_type: type[ast.AST]) -> bool:
     """Return `True` if the given ``node_type`` tracks
     source positions."""
     return _POSITIONAL_ATTRIBUTES_SET.issubset(node_type._attributes)
@@ -246,7 +232,7 @@ def unpack_lhs(node: ast.AST) -> Iterator[str]:
         yield ast.unparse(node)
 
 
-def next_statement_of(node: ast.stmt, context: Context) -> Optional[ast.stmt]:
+def next_statement_of(node: ast.stmt, context: Context) -> ast.stmt | None:
     """Get the statement that follows ``node`` in the same syntactical block."""
     parent_field, parent = context.ancestry.infer(node)
     if not parent_field is not None:
@@ -325,7 +311,7 @@ def _walk_class(node: ast.AST, top_level: bool = False) -> Iterator[ast.AST]:
         yield from node.body
 
 
-def _walk_args(node: ast.arguments) -> List[ast.arg]:
+def _walk_args(node: ast.arguments) -> list[ast.arg]:
     args = node.posonlyargs + node.args + node.kwonlyargs
     if node.vararg:
         args.append(node.vararg)
@@ -334,19 +320,19 @@ def _walk_args(node: ast.arguments) -> List[ast.arg]:
     return args
 
 
-def _walk_optional_list(nodes: List[Optional[ast.AST]]) -> Iterator[ast.AST]:
+def _walk_optional_list(nodes: list[ast.AST | None]) -> Iterator[ast.AST]:
     for node in nodes:
         yield from _walk_optional(node)
 
 
-def _walk_optional(node: Optional[ast.AST]) -> Iterator[ast.AST]:
+def _walk_optional(node: ast.AST | None) -> Iterator[ast.AST]:
     if node:
         yield node
 
 
 class _Singleton:
     def __init_subclass__(cls) -> None:
-        cls._instances: Dict[Tuple[Any, ...], _Singleton] = {}  # type: ignore
+        cls._instances: dict[tuple[Any, ...], _Singleton] = {}  # type: ignore
 
     def __new__(cls, *args: Any) -> _Singleton:
         if not cls._instances.get(args):
