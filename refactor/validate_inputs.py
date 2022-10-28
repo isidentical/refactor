@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from argparse import Namespace
 from pathlib import Path
 
@@ -14,9 +16,7 @@ def validate_main_inputs(options: Namespace) -> None:
     """
     if refactor_file := options.refactor_file:
         if not refactor_file.exists():
-            raise ValueError(
-                f"Given --refactor-file '{refactor_file!s}' doesn't exist"
-            )
+            raise ValueError(f"Given --refactor-file '{refactor_file!s}' doesn't exist")
     else:
         for refactor_file in _DEFAULT_FILES:
             if refactor_file.exists():

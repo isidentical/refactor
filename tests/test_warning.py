@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import warnings
 from types import SimpleNamespace
 from unittest.mock import patch
@@ -7,9 +9,7 @@ import pytest
 from refactor import _check_asserts
 
 
-@pytest.mark.parametrize(
-    "optimization_level, expected_warnings", [(1, 1), (2, 1)]
-)
+@pytest.mark.parametrize("optimization_level, expected_warnings", [(1, 1), (2, 1)])
 def test_import_warning(optimization_level, expected_warnings):
     with pytest.warns() as record:
         with patch("sys.flags", SimpleNamespace(optimize=optimization_level)):

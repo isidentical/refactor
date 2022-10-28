@@ -1,10 +1,10 @@
 repos:
 -   repo: meta
     hooks:
-      - id: check-hooks-apply
+    -   id: check-hooks-apply
 -   repo: local
     hooks:
-      - id: refactor
+    -   id: refactor
         name: refactor
         language: system
         entry: refactor
@@ -28,19 +28,16 @@ repos:
     rev: v2.2.0
     hooks:
     -   id: setup-cfg-fmt
-        args:
-        -    --include-version-classifiers
+        args: [--include-version-classifiers]
 -   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: 'v0.982'
+    rev: v0.982
     hooks:
-      -  id: mypy
+    -   id: mypy
 -   repo: https://github.com/hakancelikdev/unimport
     rev: 0.12.1
     hooks:
-      - id: unimport
-        args:
-        -   --config
-        -   setup.cfg
+    -   id: unimport
+        args: [--config, setup.cfg]
 -   repo: https://github.com/codespell-project/codespell
     rev: v2.2.2
     hooks:

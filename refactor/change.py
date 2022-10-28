@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import difflib
 import os
 from dataclasses import dataclass
@@ -40,9 +42,7 @@ class Change:
 
     def apply_diff(self) -> None:
         """Apply the transformed version to the bound file."""
-        raw_source = self.refactored_source.encode(
-            self.file_info.get_encoding()
-        )
+        raw_source = self.refactored_source.encode(self.file_info.get_encoding())
 
         with open(self.file, "wb") as stream:
             stream.write(raw_source)

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import textwrap
 import tokenize
@@ -67,9 +69,7 @@ def test_split_lines_with_encoding(case):
         else:
             start_line = lines[lineno][col_offset:]
             end_line = lines[end_lineno][:end_col_offset]
-            match = (
-                start_line + lines[lineno + 1 : end_lineno].join() + end_line
-            )
+            match = start_line + lines[lineno + 1 : end_lineno].join() + end_line
 
         assert str(match) == ast.get_source_segment(case, node)
 

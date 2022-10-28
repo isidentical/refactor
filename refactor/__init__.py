@@ -1,4 +1,6 @@
 # TODO: remove the deprecated aliases on 1.0.0
+from __future__ import annotations
+
 from refactor.actions import *
 from refactor.actions import (
     Action,

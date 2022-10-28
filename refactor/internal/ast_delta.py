@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 from contextlib import suppress
 from dataclasses import dataclass
@@ -51,9 +53,7 @@ def _incomplete_if(condition: bool) -> None:
         raise IncompleteASTError
 
 
-def _change_if(
-    condition: bool, *args: Any, **kwargs: Any
-) -> Iterator[ChangeSet]:
+def _change_if(condition: bool, *args: Any, **kwargs: Any) -> Iterator[ChangeSet]:
     if condition:
         yield ChangeSet(*args, **kwargs)
         raise _Continue
@@ -119,14 +119,10 @@ def _ast_sequence_delta(
 
     # TODO: distinguish insertions to the start and the end
     if len(base_sequence) != len(new_sequence):
-        yield ChangeSet(
-            ChangeType.FIELD_SIZE, baseline, new_node, on_field=field
-        )
+        yield ChangeSet(ChangeType.FIELD_SIZE, baseline, new_node, on_field=field)
         return None
 
-    for index, (base_item, new_item) in enumerate(
-        zip(base_sequence, new_sequence)
-    ):
+    for index, (base_item, new_item) in enumerate(zip(base_sequence, new_sequence)):
         _item_change_if = partial(
             _change_if,
             original_node=baseline,
@@ -144,6 +140,4 @@ def _ast_sequence_delta(
                     _incomplete_if(not isinstance(new_item, ast.AST))
                     yield from ast_delta(base_item, new_item)
             else:
-                yield from _item_change_if(
-                    new_item != base_item, ChangeType.ITEM_VALUE
-                )
+                yield from _item_change_if(new_item != base_item, ChangeType.ITEM_VALUE)

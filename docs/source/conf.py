@@ -5,15 +5,17 @@
 # list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Path setup --------------------------------------------------------------
+from __future__ import annotations
 
+import sys
+from pathlib import Path
+
+# -- Path setup --------------------------------------------------------------
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
 # documentation root, use os.path.abspath to make it absolute, like shown here.
 #
 
-import sys
-from pathlib import Path
 
 path = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(path))

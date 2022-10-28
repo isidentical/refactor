@@ -89,9 +89,7 @@ class GraphPath:
             ancestor_field_value = getattr(ancestor, ancestor_field)
             if isinstance(ancestor_field_value, list):
                 parts.append(
-                    IndexAccess(
-                        type(cursor), ancestor_field_value.index(cursor)
-                    )
+                    IndexAccess(type(cursor), ancestor_field_value.index(cursor))
                 )
                 parts.append(FieldAccess(list, ancestor_field))
             elif isinstance(ancestor_field_value, ast.AST):

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 from pathlib import Path
 from typing import Optional
@@ -19,9 +21,7 @@ class RefactorAsserts(refactor.Rule):
         replacement = ast.Raise(
             exc=ast.Call(
                 ast.Name("ValueError", ast.Load()),
-                args=[
-                    ast.Constant(f"condition failed: {ast.unparse(node.test)}")
-                ],
+                args=[ast.Constant(f"condition failed: {ast.unparse(node.test)}")],
                 keywords=[],
             )
         )

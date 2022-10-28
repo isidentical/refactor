@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 from contextlib import suppress
 from typing import Callable, Iterator, List, Optional
@@ -50,9 +52,7 @@ def expect_changes(
 
 @register_optimizer
 @common._guarded(IncompleteASTError)
-def rename_optimizer(
-    action: BaseAction, context: Context
-) -> Optional[BaseAction]:
+def rename_optimizer(action: BaseAction, context: Context) -> Optional[BaseAction]:
     assert isinstance(action, Replace)
     assert is_named_node(action.node) and is_named_node(action.target)
     assert action.node.name != action.target.name

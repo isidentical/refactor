@@ -202,9 +202,7 @@ def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
         target_positions = position_for(target)
         return tuple(
             abs(target_position - node_position)
-            for target_position, node_position in zip(
-                target_positions, node_positions
-            )
+            for target_position, node_position in zip(target_positions, node_positions)
         )
 
     sorted_targets = sorted(targets, key=closest)
@@ -235,9 +233,7 @@ def has_positions(node_type: Type[ast.AST]) -> bool:
 
 def position_for(node: ast.AST) -> PositionType:
     """Return a 4-item tuple of positions for the given ``node``."""
-    positions = tuple(
-        getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES
-    )
+    positions = tuple(getattr(node, attribute) for attribute in _POSITIONAL_ATTRIBUTES)
     return cast(PositionType, positions)
 
 
@@ -251,8 +247,7 @@ def unpack_lhs(node: ast.AST) -> Iterator[str]:
 
 
 def next_statement_of(node: ast.stmt, context: Context) -> Optional[ast.stmt]:
-    """Get the statement that follows ``node`` in the same syntactical block.
-    """
+    """Get the statement that follows ``node`` in the same syntactical block."""
     parent_field, parent = context.ancestry.infer(node)
     if not parent_field is not None:
         raise ValueError("condition failed: parent_field is not None")

@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 
 import pytest
@@ -42,11 +44,7 @@ INVALID_ERASES_TREE = ast.parse(INVALID_ERASES)
 
 @pytest.mark.parametrize(
     "invalid_node",
-    [
-        node
-        for node in ast.walk(INVALID_ERASES_TREE)
-        if isinstance(node, ast.Assert)
-    ],
+    [node for node in ast.walk(INVALID_ERASES_TREE) if isinstance(node, ast.Assert)],
 )
 def test_erase_invalid(invalid_node):
     context = Context(INVALID_ERASES, INVALID_ERASES_TREE)

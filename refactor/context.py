@@ -114,14 +114,10 @@ class Context:
             backend_cls = UNPARSER_BACKENDS[unparser_backend]
         elif isinstance(unparser_backend, type):
             if not issubclass(unparser_backend, BaseUnparser):
-                raise ValueError(
-                    "'unparser_backend' must inherit from 'BaseUnparser'"
-                )
+                raise ValueError("'unparser_backend' must inherit from 'BaseUnparser'")
             backend_cls = unparser_backend
         else:
-            raise ValueError(
-                "'unparser_backend' must be either a string or a type"
-            )
+            raise ValueError("'unparser_backend' must be either a string or a type")
 
         unparser = backend_cls(source=self.source)
         return unparser.unparse(node)  # type: ignore
@@ -322,9 +318,7 @@ class ScopeInfo(common._Singleton):
                 # with x as (y, z): ...
                 for item in node.items:
                     if item.optional_vars:
-                        for identifier in common.unpack_lhs(
-                            item.optional_vars
-                        ):
+                        for identifier in common.unpack_lhs(item.optional_vars):
                             local_definitions[identifier].append(node)
             elif isinstance(node, (ast.For, ast.AsyncFor, ast.comprehension)):
                 # for a, b in c: ...
@@ -355,10 +349,7 @@ class ScopeInfo(common._Singleton):
         else:
             parts.append("<" + type(self.node).__name__.lower() + ">")
 
-        if (
-            self.parent is not None
-            and self.parent.scope_type is not ScopeType.GLOBAL
-        ):
+        if self.parent is not None and self.parent.scope_type is not ScopeType.GLOBAL:
             if self.parent.scope_type is ScopeType.FUNCTION:
                 parts.append("<locals>")
             parts.append(self.parent.name)

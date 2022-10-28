@@ -7,13 +7,7 @@ from dataclasses import dataclass, field, replace
 from typing import Generic, Tuple, TypeVar, cast
 
 from refactor.ast import split_lines
-from refactor.common import (
-    PositionType,
-    _hint,
-    clone,
-    find_indent,
-    position_for,
-)
+from refactor.common import PositionType, _hint, clone, find_indent, position_for
 from refactor.context import Context
 
 K = TypeVar("K")
@@ -46,8 +40,7 @@ class BaseAction:
         raise NotImplementedError
 
     def _stack_effect(self) -> Tuple[ast.AST, int]:
-        """Return the stack effect of this action (relative to the node it returns.)
-        """
+        """Return the stack effect of this action (relative to the node it returns.)"""
         raise NotImplementedError("This action can't be chained, yet.")
 
     def _replace_input(self, node: ast.AST) -> BaseAction:
@@ -115,9 +108,7 @@ class _ReplaceCodeSegmentAction(BaseAction):
 
 @_hint("deprecated_alias", "Action")
 @dataclass
-class LazyReplace(
-    _ReplaceCodeSegmentAction, _LazyActionMixin[ast.AST, ast.AST]
-):
+class LazyReplace(_ReplaceCodeSegmentAction, _LazyActionMixin[ast.AST, ast.AST]):
     """Transforms the code segment of the given `node` with
     the re-synthesized version :py:meth:`LazyReplace.build`'s
     output.
@@ -264,10 +255,7 @@ class Erase(_ReplaceCodeSegmentAction):
                 raise RuntimeError(f"Couldn't find the parent of {self.node}.")
 
         parent_field_value = getattr(parent_node, parent_field)
-        return (
-            isinstance(parent_field_value, list)
-            and len(parent_field_value) == 1
-        )
+        return isinstance(parent_field_value, list) and len(parent_field_value) == 1
 
     def _get_segment_span(self, context: Context) -> PositionType:
         return position_for(self.node)
@@ -308,6 +296,4 @@ class EraseOrReplace(Erase):
             return ""
 
     def _stack_effect(self) -> Tuple[ast.AST, int]:
-        raise NotImplementedError(
-            "EraseOrReplace doesn't support chained actions."
-        )
+        raise NotImplementedError("EraseOrReplace doesn't support chained actions.")

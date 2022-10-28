@@ -238,9 +238,7 @@ class PreciseUnparser(BaseUnparser):
             if comment_begin == -1 or comment_begin != node.col_offset:
                 break
 
-            preceding_comments.append(
-                (node_start - offset, line, comment_begin)
-            )
+            preceding_comments.append((node_start - offset, line, comment_begin))
 
         for comment_info in reversed(preceding_comments):
             _write_if_unseen_comment(*comment_info)

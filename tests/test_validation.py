@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 from argparse import Namespace
 from contextlib import contextmanager
 from pathlib import Path

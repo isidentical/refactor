@@ -71,8 +71,7 @@ class Rule:
 
 @dataclass
 class Session:
-    """A refactoring session that consists of a set of rules and a configuration.
-    """
+    """A refactoring session that consists of a set of rules and a configuration."""
 
     rules: List[Type[Rule]] = field(default_factory=list)
     config: Configuration = field(default_factory=Configuration)
@@ -198,9 +197,7 @@ class Session:
                     if match is None:
                         continue
                     elif isinstance(match, BaseAction):
-                        new_source = self._apply_single(
-                            rule.context, source, match
-                        )
+                        new_source = self._apply_single(rule.context, source, match)
                     elif isinstance(match, Iterator):
                         new_source = self._apply_multiple(rule, source, match)
                     else:
@@ -218,9 +215,7 @@ class Session:
 
         return source, _changed
 
-    def _unparsable_source_code(
-        self, source: str, exc: SyntaxError
-    ) -> NoReturn:
+    def _unparsable_source_code(self, source: str, exc: SyntaxError) -> NoReturn:
         error_message = "Generated source is unparsable."
 
         if self.config.debug_mode:

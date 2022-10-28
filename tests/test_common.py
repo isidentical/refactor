@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import textwrap
 
@@ -113,10 +115,7 @@ def test_find_closest():
     tree = ast.parse(source)
     right_node = tree.body[0].body[0].body[0].value.right
     target_nodes = [
-        node
-        for node in ast.walk(tree)
-        if has_positions(node)
-        if node is not right_node
+        node for node in ast.walk(tree) if has_positions(node) if node is not right_node
     ]
 
     closest_node = find_closest(right_node, *target_nodes)

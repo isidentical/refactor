@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import textwrap
 import typing
@@ -222,9 +224,7 @@ class TypingAutoImporter(Rule):
     def find_last_import(self, tree):
         assert isinstance(tree, ast.Module)
         for index, node in enumerate(tree.body, -1):
-            if isinstance(node, ast.Expr) and isinstance(
-                node.value, ast.Constant
-            ):
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
                 continue
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 continue
@@ -240,9 +240,7 @@ class TypingAutoImporter(Rule):
         assert not node.id.startswith("__")
 
         scope = self.context["scope"].resolve(node)
-        typing_imports = self.context["import_finder"].collect(
-            "typing", scope=scope
-        )
+        typing_imports = self.context["import_finder"].collect("typing", scope=scope)
 
         if len(typing_imports) == 0:
             last_import = self.find_last_import(self.context.tree)
@@ -324,8 +322,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
         assert any(kw_default is None for kw_default in node.args.kw_defaults)
 
         if isinstance(node, ast.Lambda) and not (
-            isinstance(node.body, ast.Name)
-            and isinstance(node.body.ctx, ast.Load)
+            isinstance(node.body, ast.Name) and isinstance(node.body.ctx, ast.Load)
         ):
             scope = self.context["scope"].resolve(node.body)
             scope.definitions.get(node.body.id, [])
@@ -448,9 +445,7 @@ class InternalizeFunctions(Rule):
             return None
 
     def match(self, node: ast.AST) -> Replace:
-        assert isinstance(
-            node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)
-        )
+        assert isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef))
         assert not node.name.startswith("_")
 
         node_scope = self.context.scope.resolve(node)
@@ -982,6 +977,6 @@ def test_complete_rules(rule, tmp_path):
     assert change is not None
 
     change.apply_diff()
-    assert src_file_path.read_text(
-        encoding=DEFAULT_ENCODING
-    ) == textwrap.dedent(rule.EXPECTED_SOURCE)
+    assert src_file_path.read_text(encoding=DEFAULT_ENCODING) == textwrap.dedent(
+        rule.EXPECTED_SOURCE
+    )

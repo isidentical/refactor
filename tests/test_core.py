@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import re
 import textwrap
@@ -207,9 +209,7 @@ def test_session_run_deterministic():
     session = Session([RecursiveRule])
 
     # Using _run here to see the 'changed' flag in action.
-    refactored_source, changed = session._run(
-        "2 + 2 + 3 + 4", file_info=test_file
-    )
+    refactored_source, changed = session._run("2 + 2 + 3 + 4", file_info=test_file)
     assert not changed
     assert refactored_source == "2 + 2 + 3 + 4"
 

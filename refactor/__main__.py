@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import importlib
 import importlib.util
 from argparse import ArgumentParser
@@ -36,9 +38,7 @@ def main() -> int:
     parser = ArgumentParser()
     parser.add_argument("src", nargs="+", type=Path)
     parser.add_argument("-d", "--refactor-file", type=Path)
-    parser.add_argument(
-        "-n", "--dont-apply", action="store_false", default=True
-    )
+    parser.add_argument("-n", "--dont-apply", action="store_false", default=True)
 
     options = parser.parse_args()
     validate_main_inputs(options)
