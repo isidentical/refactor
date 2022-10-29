@@ -1,4 +1,4 @@
-name: Publish
+name: Publish on PyPI
 
 on:
   release:
@@ -21,10 +21,9 @@ jobs:
 
       - name: Build the package
         run: |
-          python -m build --sdist --wheel \
-          --outdir dist/ .
+          python -m build
 
       - name: Publish
-        uses: pypa/gh-action-pypi-publish@master
+        uses: pypa/gh-action-pypi-publish@release/v1
         with:
           password: ${{ secrets.PYPI_TOKEN }}

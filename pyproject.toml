@@ -9,3 +9,12 @@ preview = true
 [tool.isort]
 profile = "black"
 add_imports = ["from __future__ import annotations"]
+
+[tool.unimport]
+remove = true
+ignore_init = true
+
+[tool.mypy]
+no_warn_no_return = true
+disallow_incomplete_defs = false
+disable_error_code = "attr-defined"
