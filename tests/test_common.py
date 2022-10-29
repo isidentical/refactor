@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import textwrap
 
@@ -71,7 +73,7 @@ def test_is_contextful(node, expected):
 @pytest.mark.parametrize(
     "original, expected",
     [
-        (str(), str()),
+        ("", ""),
         ("rule", "rule"),
         ("Rule", "rule"),
         ("SomeRule", "some_rule"),
@@ -85,8 +87,8 @@ def test_pascal_to_snake(original, expected):
 @pytest.mark.parametrize(
     "original, indent, prefix",
     [
-        (str(), str(), str()),
-        (" ", " ", str()),
+        ("", "", ""),
+        (" ", " ", ""),
         ("x", "", "x"),
         (" x", " ", "x"),
         ("  x", "  ", "x"),
@@ -113,10 +115,7 @@ def test_find_closest():
     tree = ast.parse(source)
     right_node = tree.body[0].body[0].body[0].value.right
     target_nodes = [
-        node
-        for node in ast.walk(tree)
-        if has_positions(node)
-        if node is not right_node
+        node for node in ast.walk(tree) if has_positions(node) if node is not right_node
     ]
 
     closest_node = find_closest(right_node, *target_nodes)

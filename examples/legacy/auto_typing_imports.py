@@ -3,16 +3,13 @@ from __future__ import annotations
 import ast
 import typing
 from dataclasses import dataclass
-from typing import Dict, List
 
 import refactor
 from refactor import common, context
 
 
 class ImportFinder(refactor.Representative):
-    def collect(
-        self, name: str, scope: context.ScopeInfo
-    ) -> Dict[str, ast.ImportFrom]:
+    def collect(self, name: str, scope: context.ScopeInfo) -> dict[str, ast.ImportFrom]:
         import_statents = [
             node
             for node in ast.walk(self.context.tree)
@@ -32,7 +29,7 @@ class ImportFinder(refactor.Representative):
 @dataclass
 class AddNewImport(refactor.LazyInsertAfter):
     module: str
-    names: List[str]
+    names: list[str]
 
     def build(self) -> ast.stmt:
         return ast.ImportFrom(
@@ -58,9 +55,7 @@ class TypingAutoImporter(refactor.Rule):
     def find_last_import(self, tree: ast.AST) -> ast.stmt:
         assert isinstance(tree, ast.Module)
         for index, node in enumerate(tree.body, -1):
-            if isinstance(node, ast.Expr) and isinstance(
-                node.value, ast.Constant
-            ):
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
                 continue
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 continue
@@ -76,9 +71,7 @@ class TypingAutoImporter(refactor.Rule):
         assert not node.id.startswith("__")
 
         scope = self.context["scope"].resolve(node)
-        typing_imports = self.context["import_finder"].collect(
-            "typing", scope=scope
-        )
+        typing_imports = self.context["import_finder"].collect("typing", scope=scope)
 
         if len(typing_imports) == 0:
             last_import = self.find_last_import(self.context.tree)

@@ -1,5 +1,7 @@
 # python examples/replace_placeholders.py examples/test/placeholder.py
 
+from __future__ import annotations
+
 import ast
 
 import refactor

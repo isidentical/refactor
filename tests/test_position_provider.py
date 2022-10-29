@@ -1,6 +1,8 @@
+from __future__ import annotations
+
 import ast
+from collections.abc import Iterator
 from pathlib import Path
-from typing import Iterator
 
 import refactor
 from refactor import common
@@ -22,9 +24,7 @@ def test_position_provider_for_definitions():
         nodes = [
             node
             for node in ast.walk(context.tree)
-            if isinstance(
-                node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)
-            )
+            if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef))
         ]
         for node in nodes:
             position = infer_identifier_position(node, node.name, context)

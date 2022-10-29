@@ -1,8 +1,10 @@
+from __future__ import annotations
+
 from argparse import Namespace
+from collections.abc import Generator
 from contextlib import contextmanager
 from pathlib import Path
 from tempfile import NamedTemporaryFile
-from typing import Generator
 
 import pytest
 

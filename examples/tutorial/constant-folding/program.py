@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 PI = 3.14
 TAU = PI + PI
 

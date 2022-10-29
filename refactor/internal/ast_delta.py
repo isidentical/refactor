@@ -1,12 +1,15 @@
+from __future__ import annotations
+
 import ast
+from collections.abc import Iterator
 from contextlib import suppress
 from dataclasses import dataclass
 from enum import Enum, auto
 from functools import cache, partial
-from typing import Any, Dict, Iterator, List, Optional, Type, cast
+from typing import Any, cast
 
 _MISSING = object()
-_CONSTANT_FIELDS: Dict[Type[ast.AST], List[str]] = {ast.Constant: ["value"]}
+_CONSTANT_FIELDS: dict[type[ast.AST], list[str]] = {ast.Constant: ["value"]}
 if hasattr(ast, "MatchSingleton"):
     _CONSTANT_FIELDS[ast.MatchSingleton] = ["value"]
 
@@ -37,12 +40,12 @@ class ChangeSet:
     change_type: ChangeType
     original_node: Any
     new_node: Any
-    on_field: Optional[str] = None
-    on_index: Optional[int] = None
+    on_field: str | None = None
+    on_index: int | None = None
 
 
 @cache
-def _is_constant(node_type: Type[ast.AST], field: str) -> bool:
+def _is_constant(node_type: type[ast.AST], field: str) -> bool:
     return field in _CONSTANT_FIELDS.get(node_type, [])
 
 
@@ -51,9 +54,7 @@ def _incomplete_if(condition: bool) -> None:
         raise IncompleteASTError
 
 
-def _change_if(
-    condition: bool, *args: Any, **kwargs: Any
-) -> Iterator[ChangeSet]:
+def _change_if(condition: bool, *args: Any, **kwargs: Any) -> Iterator[ChangeSet]:
     if condition:
         yield ChangeSet(*args, **kwargs)
         raise _Continue
@@ -114,19 +115,15 @@ def _ast_sequence_delta(
     new_node: ast.AST,
     field: str,
 ) -> Iterator[ChangeSet]:
-    base_sequence: List[Any] = getattr(baseline, field)
-    new_sequence: List[Any] = getattr(new_node, field)
+    base_sequence: list[Any] = getattr(baseline, field)
+    new_sequence: list[Any] = getattr(new_node, field)
 
     # TODO: distinguish insertions to the start and the end
     if len(base_sequence) != len(new_sequence):
-        yield ChangeSet(
-            ChangeType.FIELD_SIZE, baseline, new_node, on_field=field
-        )
+        yield ChangeSet(ChangeType.FIELD_SIZE, baseline, new_node, on_field=field)
         return None
 
-    for index, (base_item, new_item) in enumerate(
-        zip(base_sequence, new_sequence)
-    ):
+    for index, (base_item, new_item) in enumerate(zip(base_sequence, new_sequence)):
         _item_change_if = partial(
             _change_if,
             original_node=baseline,
@@ -144,6 +141,4 @@ def _ast_sequence_delta(
                     _incomplete_if(not isinstance(new_item, ast.AST))
                     yield from ast_delta(base_item, new_item)
             else:
-                yield from _item_change_if(
-                    new_item != base_item, ChangeType.ITEM_VALUE
-                )
+                yield from _item_change_if(new_item != base_item, ChangeType.ITEM_VALUE)

@@ -6,24 +6,11 @@ import operator
 import os
 import tokenize
 from collections import UserList, UserString
+from collections.abc import Generator, Iterator
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from typing import (
-    Any,
-    ContextManager,
-    Generator,
-    Iterator,
-    List,
-    Optional,
-    Protocol,
-    Set,
-    SupportsIndex,
-    Tuple,
-    TypeVar,
-    Union,
-    cast,
-)
+from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast
 
 from refactor import common
 
@@ -35,7 +22,7 @@ StringType = TypeVar("StringType", bound=AnyStringType)
 
 @dataclass
 class Lines(UserList[StringType]):
-    lines: List[StringType]
+    lines: list[StringType]
 
     def __post_init__(self) -> None:
         super().__init__(self.lines)
@@ -80,7 +67,7 @@ class SourceSegment(UserString):
     data: str
     encoding: str = DEFAULT_ENCODING
 
-    def __getitem__(self, index: Union[SupportsIndex, slice]) -> SourceSegment:
+    def __getitem__(self, index: SupportsIndex | slice) -> SourceSegment:
         raw_line = self.encode(encoding=self.encoding)
         if isinstance(index, slice):
             view = raw_line[index].decode(encoding=self.encoding)
@@ -99,7 +86,7 @@ class SourceSegment(UserString):
         return SourceSegment(view, encoding=self.encoding)
 
 
-def split_lines(source: str, *, encoding: Optional[str] = None) -> Lines:
+def split_lines(source: str, *, encoding: str | None = None) -> Lines:
     """Split the given source code into lines and
     return a list-like object (:py:class:`refactor.ast.Lines`)."""
 
@@ -124,7 +111,7 @@ class BaseUnparser(ast._Unparser):  # type: ignore
     """A public :py:class:`ast._Unparser` API that can
     be used to customize the AST re-synthesis process."""
 
-    source: Optional[str]
+    source: str | None
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
         self.source = kwargs.pop("source", None)
@@ -134,7 +121,7 @@ class BaseUnparser(ast._Unparser):  # type: ignore
         return self.visit(node)
 
     @cached_property
-    def tokens(self) -> Tuple[tokenize.TokenInfo, ...]:
+    def tokens(self) -> tuple[tokenize.TokenInfo, ...]:
         buffer = io.StringIO(self.source)
         token_stream = tokenize.generate_tokens(buffer.readline)
         return tuple(token_stream)
@@ -152,10 +139,10 @@ class PreciseUnparser(BaseUnparser):
     for major statements and child node recovery."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        self._visited_comment_lines: Set[int] = set()
+        self._visited_comment_lines: set[int] = set()
         super().__init__(*args, **kwargs)
 
-    def traverse(self, node: Union[List[ast.AST], ast.AST]) -> None:
+    def traverse(self, node: list[ast.AST] | ast.AST) -> None:
         if isinstance(node, list) or self.source is None:
             return super().traverse(node)
 
@@ -238,9 +225,7 @@ class PreciseUnparser(BaseUnparser):
             if comment_begin == -1 or comment_begin != node.col_offset:
                 break
 
-            preceding_comments.append(
-                (node_start - offset, line, comment_begin)
-            )
+            preceding_comments.append((node_start - offset, line, comment_begin))
 
         for comment_info in reversed(preceding_comments):
             _write_if_unseen_comment(*comment_info)

@@ -1,8 +1,11 @@
+from __future__ import annotations
+
 import ast
 import tokenize
+from collections.abc import Iterator
 from functools import singledispatch
 from itertools import chain
-from typing import Callable, Iterator, Optional, Union
+from typing import Callable
 
 from refactor import common
 from refactor.ast import Lines, split_lines
@@ -42,7 +45,7 @@ def infer_identifier_position(
     node: ast.AST,
     identifier_value: str,
     context: Context,
-) -> Optional[common.PositionType]:
+) -> common.PositionType | None:
     ...
 
 
@@ -57,10 +60,10 @@ EXPECTED_KEYWORDS = {
 @infer_identifier_position.register(ast.FunctionDef)
 @infer_identifier_position.register(ast.AsyncFunctionDef)
 def infer_definition_name(
-    node: Union[ast.ClassDef, ast.FunctionDef, ast.AsyncFunctionDef],
+    node: ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef,
     identifier_value: str,
     context: Context,
-) -> Optional[common.PositionType]:
+) -> common.PositionType | None:
     source_segment = common.get_source_segment(context.source, node)
     if source_segment is None:
         return None
@@ -68,7 +71,7 @@ def infer_definition_name(
     lines = split_lines(source_segment)
     tokens = _ignore_space(tokenize.generate_tokens(_line_wrapper(lines)))
 
-    def _next_token() -> Optional[tokenize.TokenInfo]:
+    def _next_token() -> tokenize.TokenInfo | None:
         try:
             return next(tokens, None)
         except (SyntaxError, tokenize.TokenError):
@@ -76,7 +79,7 @@ def infer_definition_name(
 
     def _expect_token(
         expected_type: int, expected_str: str
-    ) -> Optional[tokenize.TokenInfo]:
+    ) -> tokenize.TokenInfo | None:
         if (
             (next_token := _next_token())
             and next_token.exact_type == expected_type

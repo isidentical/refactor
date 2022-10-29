@@ -1,15 +1,20 @@
 [build-system]
-requires = ["setuptools>=40.8.0", "wheel"]
+requires = ["setuptools"]
 build-backend = "setuptools.build_meta"
 
 [tool.black]
-line-length = 79
-target-version = ['py39']
+target-version = ["py39"]
 preview = true
 
 [tool.isort]
-atomic=true
-force_grid_wrap=0
-include_trailing_comma=true
-multi_line_output=3
-use_parentheses=true
+profile = "black"
+add_imports = ["from __future__ import annotations"]
+
+[tool.unimport]
+remove = true
+ignore_init = true
+
+[tool.mypy]
+no_warn_no_return = true
+disallow_incomplete_defs = false
+disable_error_code = "attr-defined"

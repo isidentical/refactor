@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 from pathlib import Path
 
@@ -270,9 +272,7 @@ def test_multiple_field_change(pack):
 
 def test_sequence_diff(pack):
     baseline, new, changes = pack
-    assert changes == [
-        ChangeSet(ChangeType.FIELD_SIZE, baseline, new, on_field="body")
-    ]
+    assert changes == [ChangeSet(ChangeType.FIELD_SIZE, baseline, new, on_field="body")]
 
 
 def test_nested_sequence_diff(pack):
@@ -289,16 +289,12 @@ def test_nested_sequence_diff(pack):
 
 def test_sequence_size_reduction(pack):
     baseline, new, changes = pack
-    assert changes == [
-        ChangeSet(ChangeType.FIELD_SIZE, baseline, new, on_field="body")
-    ]
+    assert changes == [ChangeSet(ChangeType.FIELD_SIZE, baseline, new, on_field="body")]
 
 
 def test_sequence_size_increase(pack):
     baseline, new, changes = pack
-    assert changes == [
-        ChangeSet(ChangeType.FIELD_SIZE, baseline, new, on_field="body")
-    ]
+    assert changes == [ChangeSet(ChangeType.FIELD_SIZE, baseline, new, on_field="body")]
 
 
 def test_sequence_weird(pack):

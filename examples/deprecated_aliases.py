@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 
 from refactor import Rule, common, run
@@ -32,10 +34,7 @@ class RenameDeprecatedAliases(Rule):
                 parent_field,
                 parent_node,
             ) in self.context.ancestry.traverse(node):
-                if (
-                    common.is_function(parent_node)
-                    and parent_field == "returns"
-                ):
+                if common.is_function(parent_node) and parent_field == "returns":
                     return "BaseAction"
 
         return ACTION_ALIAS_MAPPING[name]
@@ -90,9 +89,7 @@ class AdjustImports(Rule):
             ),
         )
 
-    def _adjust_from(
-        self, node: ast.ImportFrom, scope: ScopeInfo
-    ) -> BaseAction:
+    def _adjust_from(self, node: ast.ImportFrom, scope: ScopeInfo) -> BaseAction:
         assert node.module in ("refactor", "refactor.core")
 
         aliases_to_fill = [
@@ -101,9 +98,7 @@ class AdjustImports(Rule):
             if alias.name in ACTION_ALIAS_MAPPING
             if not scope.get_definitions(ACTION_ALIAS_MAPPING[alias.name])
         ]
-        if "LazyReplace" in aliases_to_fill and not scope.get_definitions(
-            "BaseAction"
-        ):
+        if "LazyReplace" in aliases_to_fill and not scope.get_definitions("BaseAction"):
             aliases_to_fill += ["BaseAction"]
 
         assert aliases_to_fill

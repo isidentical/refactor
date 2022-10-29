@@ -1,19 +1,14 @@
+from __future__ import annotations
+
 import os
 from argparse import ArgumentParser
 from collections import defaultdict
+from collections.abc import Iterable
 from contextlib import nullcontext
 from functools import partial
 from itertools import chain
 from pathlib import Path
-from typing import (
-    Any,
-    ContextManager,
-    DefaultDict,
-    Dict,
-    Iterable,
-    List,
-    Optional,
-)
+from typing import Any, ContextManager, DefaultDict
 
 from refactor.core import Session
 
@@ -37,7 +32,7 @@ def expand_paths(path: Path) -> Iterable[Path]:
             yield path
 
 
-def dump_stats(stats: Dict[str, int]) -> str:
+def dump_stats(stats: dict[str, int]) -> str:
     messages = []
     for status, n_files in stats.items():
         if n_files == 0:
@@ -108,14 +103,12 @@ def run_files(
     return stats["reformatted"] > 0
 
 
-def unbound_main(session: Session, argv: Optional[List[str]] = None) -> int:
+def unbound_main(session: Session, argv: list[str] | None = None) -> int:
     parser = ArgumentParser()
     parser.add_argument("src", nargs="+", type=Path)
     parser.add_argument("-a", "--apply", action="store_true", default=False)
     parser.add_argument("-w", "--workers", type=int, default=_DEFAULT_WORKERS)
-    parser.add_argument(
-        "-d", "--enable-debug-mode", action="store_true", default=False
-    )
+    parser.add_argument("-d", "--enable-debug-mode", action="store_true", default=False)
 
     options = parser.parse_args()
     session.config.debug_mode = options.enable_debug_mode

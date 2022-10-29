@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- Added official support for 3.11.
+
 ## 0.6.2
 
 - Augmented and annotated assignments now counted towards definitions when analyzing the scope.
@@ -164,7 +168,7 @@ call(
 - All command line programs now has `-a`, `--apply` option which writes the
   refactored version back to the file instead of dumping the diff.
 - Some of non-deterministic refactors (generating variations of the same code)
-  are now early exitted.
+  are now early exited.
 - `refactor.context.ScopeInfo` objects now can list definitions made in their
   context.
 - `refactor.context.Context` objects now store the path for the module they are

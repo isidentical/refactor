@@ -1,10 +1,12 @@
+from __future__ import annotations
+
 import ast
 import textwrap
 import typing
+from collections.abc import Iterator, Sequence
 from copy import deepcopy
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterator, List, Optional, Sequence, Union
 
 import pytest
 
@@ -171,7 +173,7 @@ class ImportFinder(Representative):
 @dataclass
 class AddNewImport(LazyInsertAfter):
     module: str
-    names: List[str]
+    names: list[str]
 
     def build(self):
         return ast.ImportFrom(
@@ -222,9 +224,7 @@ class TypingAutoImporter(Rule):
     def find_last_import(self, tree):
         assert isinstance(tree, ast.Module)
         for index, node in enumerate(tree.body, -1):
-            if isinstance(node, ast.Expr) and isinstance(
-                node.value, ast.Constant
-            ):
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
                 continue
             elif isinstance(node, (ast.Import, ast.ImportFrom)):
                 continue
@@ -240,9 +240,7 @@ class TypingAutoImporter(Rule):
         assert not node.id.startswith("__")
 
         scope = self.context["scope"].resolve(node)
-        typing_imports = self.context["import_finder"].collect(
-            "typing", scope=scope
-        )
+        typing_imports = self.context["import_finder"].collect("typing", scope=scope)
 
         if len(typing_imports) == 0:
             last_import = self.find_last_import(self.context.tree)
@@ -319,13 +317,12 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
 
         """
 
-    def match(self, node: ast.AST) -> Optional[BaseAction]:
+    def match(self, node: ast.AST) -> BaseAction | None:
         assert isinstance(node, (ast.FunctionDef, ast.Lambda))
         assert any(kw_default is None for kw_default in node.args.kw_defaults)
 
         if isinstance(node, ast.Lambda) and not (
-            isinstance(node.body, ast.Name)
-            and isinstance(node.body.ctx, ast.Load)
+            isinstance(node.body, ast.Name) and isinstance(node.body.ctx, ast.Load)
         ):
             scope = self.context["scope"].resolve(node.body)
             scope.definitions.get(node.body.id, [])
@@ -429,7 +426,7 @@ class InternalizeFunctions(Rule):
                     pass
         """
 
-    def _get_public_functions(self) -> Optional[Sequence[str]]:
+    def _get_public_functions(self) -> Sequence[str] | None:
         # __all__ generally contains only a list/tuple of strings
         # so it should be easy to infer.
 
@@ -448,9 +445,7 @@ class InternalizeFunctions(Rule):
             return None
 
     def match(self, node: ast.AST) -> Replace:
-        assert isinstance(
-            node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef)
-        )
+        assert isinstance(node, (ast.FunctionDef, ast.ClassDef, ast.AsyncFunctionDef))
         assert not node.name.startswith("_")
 
         node_scope = self.context.scope.resolve(node)
@@ -578,7 +573,7 @@ class RemoveDeadCode(Rule):
             pass
     """
 
-    def match(self, node: ast.AST) -> Optional[EraseOrReplace]:
+    def match(self, node: ast.AST) -> EraseOrReplace | None:
         assert isinstance(node, ast.If)
 
         if isinstance(node.test, ast.Constant):
@@ -603,7 +598,7 @@ class DownstreamAnalyzer(Representative):
     context_providers = (context.Scope,)
 
     def iter_dependents(
-        self, name: str, source: Union[ast.Import, ast.ImportFrom]
+        self, name: str, source: ast.Import | ast.ImportFrom
     ) -> Iterator[ast.Name]:
         for node in ast.walk(self.context.tree):
             if (
@@ -930,7 +925,7 @@ class AtomicTryBlock(Rule):
             except (SyntaxError, FileNotFoundError):
                 continue"""
 
-    def match(self, node: ast.AST) -> Iterator[Union[Replace, InsertAfter]]:
+    def match(self, node: ast.AST) -> Iterator[Replace | InsertAfter]:
         assert isinstance(node, ast.Try)
         assert len(node.body) >= 2
 
@@ -982,6 +977,6 @@ def test_complete_rules(rule, tmp_path):
     assert change is not None
 
     change.apply_diff()
-    assert src_file_path.read_text(
-        encoding=DEFAULT_ENCODING
-    ) == textwrap.dedent(rule.EXPECTED_SOURCE)
+    assert src_file_path.read_text(encoding=DEFAULT_ENCODING) == textwrap.dedent(
+        rule.EXPECTED_SOURCE
+    )

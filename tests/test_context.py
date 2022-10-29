@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import ast
 import textwrap
 
@@ -48,10 +50,7 @@ def test_ancestry():
 
     ancestry = context.metadata["ancestry"]
     assert ancestry.get_parent(first_stmt) is tree
-    assert (
-        ancestry.get_parent(first_stmt.value.left.right)
-        is first_stmt.value.left
-    )
+    assert ancestry.get_parent(first_stmt.value.left.right) is first_stmt.value.left
 
 
 def test_scope():
@@ -175,13 +174,10 @@ def test_scope_definitions():
     tree = context.tree
     scope = context.metadata["scope"]
 
-    accessors = [
-        node for node in ast.walk(tree) if ast.unparse(node) == "accessor()"
-    ]
+    accessors = [node for node in ast.walk(tree) if ast.unparse(node) == "accessor()"]
 
     scopes = {
-        scope_info.name: scope_info
-        for scope_info in map(scope.resolve, accessors)
+        scope_info.name: scope_info for scope_info in map(scope.resolve, accessors)
     }
 
     assert scopes.keys() == {
