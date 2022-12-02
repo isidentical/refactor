@@ -2,3 +2,4 @@ myst_parser==0.15.1
 furo==2022.06.21
 sphinx-design
 sphinx-hoverxref
+pytest

@@ -78,13 +78,17 @@ class _LazyActionMixin(Generic[K, T], BaseAction):
 
 class _ReplaceCodeSegmentAction(BaseAction):
     def apply(self, context: Context, source: str) -> str:
+        # The decorators are removed in the 'lines' but present in the 'context`
+        # This lead to the 'replacement' containing the decorators and the returned
+        # 'lines' to duplicate them. Proposed workaround is to add the decorators in
+        # the 'view', in case the '_resynthesize()' adds/modifies them
         lines = split_lines(source, encoding=context.file_info.get_encoding())
         (
             lineno,
             col_offset,
             end_lineno,
             end_col_offset,
-        ) = self._get_segment_span(context)
+        ) = self._get_decorated_segment_span(context)
 
         view = slice(lineno - 1, end_lineno)
         source_lines = lines[view]
@@ -100,6 +104,9 @@ class _ReplaceCodeSegmentAction(BaseAction):
         return lines.join()
 
     def _get_segment_span(self, context: Context) -> PositionType:
+        raise NotImplementedError
+
+    def _get_decorated_segment_span(self, context: Context) -> PositionType:
         raise NotImplementedError
 
     def _resynthesize(self, context: Context) -> str:
@@ -120,6 +127,13 @@ class LazyReplace(_ReplaceCodeSegmentAction, _LazyActionMixin[ast.AST, ast.AST])
 
     def _get_segment_span(self, context: Context) -> PositionType:
         return position_for(self.node)
+
+    def _get_decorated_segment_span(self, context: Context) -> PositionType:
+        lineno, col_offset, end_lineno, end_col_offset = position_for(self.node)
+        # Add the decorators to the segment span to resolve an issue with def -> async def
+        if hasattr(self.node, "decorator_list") and len(getattr(self.node, "decorator_list")) > 0:
+            lineno = position_for(getattr(self.node, "decorator_list")[0])[0]
+        return lineno, col_offset, end_lineno, end_col_offset
 
     def _resynthesize(self, context: Context) -> str:
         return context.unparse(self.build())
@@ -228,6 +242,9 @@ class _Rename(Replace):
     def _get_segment_span(self, context: Context) -> PositionType:
         return self.identifier_span
 
+    def _get_decorated_segment_span(self, context: Context) -> PositionType:
+        return self.identifier_span
+
     def _resynthesize(self, context: Context) -> str:
         return self.target.name
 
@@ -259,6 +276,13 @@ class Erase(_ReplaceCodeSegmentAction):
 
     def _get_segment_span(self, context: Context) -> PositionType:
         return position_for(self.node)
+
+    def _get_decorated_segment_span(self, context: Context) -> PositionType:
+        lineno, col_offset, end_lineno, end_col_offset = position_for(self.node)
+        # Add the decorators to the segment span to resolve an issue with def -> async def
+        if hasattr(self.node, "decorator_list") and len(self.node["decorator_list"]) > 0:
+            lineno = position_for(self.node["decorator_list"][0])[0]
+        return lineno, col_offset, end_lineno, end_col_offset
 
     def _resynthesize(self, context: Context) -> str:
         if self.is_critical_node(context):

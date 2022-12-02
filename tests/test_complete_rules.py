@@ -296,6 +296,107 @@ class MakeFunctionAsync(Rule):
         return AsyncifierAction(node)
 
 
+class MakeFunctionAsyncWithDecorators(Rule):
+    INPUT_SOURCE = """
+    @deco0
+    @deco1(arg0,
+           arg1)
+    def something():
+        a += .1
+        '''you know
+            this is custom
+                literal
+        '''
+        print(we,
+            preserve,
+                everything
+        )
+        return (
+            right + "?")
+    """
+
+    EXPECTED_SOURCE = """
+    @deco0
+    @deco1(arg0,
+           arg1)
+    async def something():
+        a += .1
+        '''you know
+            this is custom
+                literal
+        '''
+        print(we,
+            preserve,
+                everything
+        )
+        return (
+            right + "?")
+    """
+
+    def match(self, node):
+        assert isinstance(node, ast.FunctionDef)
+        return AsyncifierAction(node)
+
+
+class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
+    context_providers = (context.Scope,)
+
+    INPUT_SOURCE = """
+        class Klass:
+            def method(self, *, a):
+                print()
+
+            lambda self, *, a: print
+
+        """
+
+    EXPECTED_SOURCE = """
+        class Klass:
+            def method(self, *, a=None):
+                print()
+
+            lambda self, *, a=None: print
+
+        """
+
+    def match(self, node: ast.AST) -> BaseAction | None:
+        assert isinstance(node, (ast.FunctionDef, ast.Lambda))
+        assert any(kw_default is None for kw_default in node.args.kw_defaults)
+
+        if isinstance(node, ast.Lambda) and not (
+            isinstance(node.body, ast.Name) and isinstance(node.body.ctx, ast.Load)
+        ):
+            scope = self.context["scope"].resolve(node.body)
+            scope.definitions.get(node.body.id, [])
+
+        elif isinstance(node, ast.FunctionDef):
+            for stmt in node.body:
+                for identifier in ast.walk(stmt):
+                    if not (
+                        isinstance(identifier, ast.Name)
+                        and isinstance(identifier.ctx, ast.Load)
+                    ):
+                        continue
+
+                    scope = self.context["scope"].resolve(identifier)
+                    while not scope.definitions.get(identifier.id, []):
+                        scope = scope.parent
+                        if scope is None:
+                            break
+
+        kw_defaults = []
+        for kw_default in node.args.kw_defaults:
+            if kw_default is None:
+                kw_defaults.append(ast.Constant(value=None))
+            else:
+                kw_defaults.append(kw_default)
+
+        target = deepcopy(node)
+        target.args.kw_defaults = kw_defaults
+
+        return Replace(node, target)
+
+
 class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
     context_providers = (context.Scope,)
 
@@ -944,6 +1045,7 @@ class AtomicTryBlock(Rule):
 @pytest.mark.parametrize(
     "rule",
     [
+        MakeFunctionAsyncWithDecorators,
         ReplaceNexts,
         ReplacePlaceholders,
         PropagateConstants,
