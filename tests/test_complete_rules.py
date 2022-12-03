@@ -311,14 +311,14 @@ class MakeCallAwait(Rule):
     def somefunc():
         call(
             arg0,
-            arg1)
+             arg1) # Intentional mis-alignment
     """
 
     EXPECTED_SOURCE = """
     def somefunc():
         await call(
             arg0,
-            arg1)
+             arg1) # Intentional mis-alignment
     """
 
     def match(self, node):
@@ -967,6 +967,8 @@ class AtomicTryBlock(Rule):
             new_trys.append(new_try)
 
         first_try, *remaining_trys = new_trys
+        print(ast.unparse(node))
+        print(ast.unparse(first_try))
         yield Replace(node, first_try)
         for remaining_try in reversed(remaining_trys):
             yield InsertAfter(node, remaining_try)
@@ -975,20 +977,20 @@ class AtomicTryBlock(Rule):
 @pytest.mark.parametrize(
     "rule",
     [
-        #ReplaceNexts,
-        #ReplacePlaceholders,
-        #PropagateConstants,
-        #TypingAutoImporter,
-        #MakeFunctionAsync,
+        ReplaceNexts,
+        ReplacePlaceholders,
+        PropagateConstants,
+        TypingAutoImporter,
+        MakeFunctionAsync,
         MakeCallAwait,
-        #OnlyKeywordArgumentDefaultNotSetCheckRule,
-        #InternalizeFunctions,
-        #RemoveDeadCode,
-        #RenameImportAndDownstream,
-        #AssertEncoder,
-        #PropagateAndDelete,
-        #FoldMyConstants,
-        #AtomicTryBlock,
+        OnlyKeywordArgumentDefaultNotSetCheckRule,
+        InternalizeFunctions,
+        RemoveDeadCode,
+        RenameImportAndDownstream,
+        AssertEncoder,
+        PropagateAndDelete,
+        FoldMyConstants,
+        AtomicTryBlock,
     ],
 )
 def test_complete_rules(rule, tmp_path):

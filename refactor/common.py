@@ -176,6 +176,16 @@ def find_indent(source: str) -> tuple[str, str]:
     return source[:index], source[index:]
 
 
+def find_common_chars(source: str, compare: str) -> str:
+    """Finds the common characters starting the 2 strings"""
+    index: int = 0
+    for index, char in enumerate(source):
+        if index > len(compare) or char != compare[index]:
+            index -= 1
+            break
+    return source[:index+1]
+
+
 def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     """Find the closest node to the given ``node`` from the given
     sequence of ``targets`` (uses absolute distance from starting points)."""

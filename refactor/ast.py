@@ -13,6 +13,7 @@ from functools import cached_property
 from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, List
 
 from refactor import common
+from refactor.common import find_common_chars
 
 DEFAULT_ENCODING = "utf-8"
 
@@ -64,12 +65,12 @@ class Lines(UserList[StringType]):
         """
 
         def _is_original(i: int) -> bool:
-            return len(source_data) < index and self.data[i].replace(" ", "") == source_data[i].replace(" ", "")
+            return index < len(source_data) and str(self.data[i]) == find_common_chars(str(self.data[i]), str(source_data[i].data))
 
         for index, line in enumerate(self.data):
-            if index == 0 and not _is_original(index):
+            if index == 0:
                 self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
-            elif _is_original(index):
+            elif not _is_original(index):
                 self.data[index] = indentation + line  # type: ignore
 
         if len(self.data) >= 1:
