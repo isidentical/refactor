@@ -10,7 +10,7 @@ from collections.abc import Generator, Iterator
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast
+from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, List
 
 from refactor import common
 
@@ -46,6 +46,30 @@ class Lines(UserList[StringType]):
             if index == 0:
                 self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
             else:
+                self.data[index] = indentation + line  # type: ignore
+
+        if len(self.data) >= 1:
+            self.data[-1] += str(end_suffix)  # type: ignore
+
+    def apply_indentation_from_source(
+        self,
+        indentation: StringType,
+        source_data: List[StringType],
+        *,
+        start_prefix: AnyStringType = "",
+        end_suffix: AnyStringType = "",
+    ) -> None:
+        """Apply the given indentation only if the corresponding line in the source is different,
+        optionally with start and end prefixes to the bound source lines.
+        """
+
+        def _is_original(i: int) -> bool:
+            return len(source_data) < index and self.data[i].replace(" ", "") == source_data[i].replace(" ", "")
+
+        for index, line in enumerate(self.data):
+            if index == 0 and not _is_original(index):
+                self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
+            elif _is_original(index):
                 self.data[index] = indentation + line  # type: ignore
 
         if len(self.data) >= 1:

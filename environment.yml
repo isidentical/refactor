@@ -1,0 +1,6 @@
+name: refactor
+channels:
+  - defaults
+dependencies:
+  - python>=3.8.2
+  - pytest

@@ -296,6 +296,37 @@ class MakeFunctionAsync(Rule):
         return AsyncifierAction(node)
 
 
+class AwaitifierAction(LazyReplace):
+    def build(self):
+        if isinstance(self.node, ast.Expr):
+            self.node.value = ast.Await(self.node.value)
+            return self.node
+        if isinstance(self.node, ast.Call):
+            new_node = ast.Await(self.node)
+            return new_node
+
+
+class MakeCallAwait(Rule):
+    INPUT_SOURCE = """
+    def somefunc():
+        call(
+            arg0,
+            arg1)
+    """
+
+    EXPECTED_SOURCE = """
+    def somefunc():
+        await call(
+            arg0,
+            arg1)
+    """
+
+    def match(self, node):
+        assert isinstance(node, ast.Expr)
+        assert isinstance(node.value, ast.Call)
+        return AwaitifierAction(node)
+
+
 class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
     context_providers = (context.Scope,)
 
@@ -944,19 +975,20 @@ class AtomicTryBlock(Rule):
 @pytest.mark.parametrize(
     "rule",
     [
-        ReplaceNexts,
-        ReplacePlaceholders,
-        PropagateConstants,
-        TypingAutoImporter,
-        MakeFunctionAsync,
-        OnlyKeywordArgumentDefaultNotSetCheckRule,
-        InternalizeFunctions,
-        RemoveDeadCode,
-        RenameImportAndDownstream,
-        AssertEncoder,
-        PropagateAndDelete,
-        FoldMyConstants,
-        AtomicTryBlock,
+        #ReplaceNexts,
+        #ReplacePlaceholders,
+        #PropagateConstants,
+        #TypingAutoImporter,
+        #MakeFunctionAsync,
+        MakeCallAwait,
+        #OnlyKeywordArgumentDefaultNotSetCheckRule,
+        #InternalizeFunctions,
+        #RemoveDeadCode,
+        #RenameImportAndDownstream,
+        #AssertEncoder,
+        #PropagateAndDelete,
+        #FoldMyConstants,
+        #AtomicTryBlock,
     ],
 )
 def test_complete_rules(rule, tmp_path):
