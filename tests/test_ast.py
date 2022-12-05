@@ -7,7 +7,7 @@ import tokenize
 import pytest
 
 from refactor import common
-from refactor.ast import BaseUnparser, PreciseUnparser, split_lines
+from refactor.ast import BaseUnparser, PreciseUnparser, split_lines, PreciseEmptyLinesUnparser
 
 
 def test_split_lines():
@@ -239,4 +239,56 @@ def test_precise_unparser_comments():
     tree.body[0].body.pop()
 
     base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
+
+def test_precise_unparser_comments_empty_lines():
+    source = textwrap.dedent(
+        """\
+    def foo():
+    # unindented comment
+        # indented but not connected comment
+
+        # a
+        # a1
+        print()
+        # a2
+        print()
+        # b
+
+        # b2
+        print(
+            c # e
+        )
+        # c
+        print(d)
+        # final comment
+    """
+    )
+
+    expected_src = textwrap.dedent(
+        """\
+    def foo():
+        # indented but not connected comment
+        
+        # a
+        # a1
+        print()
+        # a2
+        print()
+        # b
+        
+        # b2
+        print(
+            c # e
+        )
+        # c
+    """
+    )
+
+    tree = ast.parse(source)
+
+    # # Remove the print(d)
+    tree.body[0].body.pop()
+
+    base = PreciseEmptyLinesUnparser(source=source)
     assert base.unparse(tree) + "\n" == expected_src
