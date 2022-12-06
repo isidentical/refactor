@@ -285,7 +285,7 @@ class PreciseEmptyLinesUnparser(PreciseUnparser):
         preceding_comments = []
         for offset, line in enumerate(reversed(lines[:node_start])):
             comment_begin = line.find("#")
-            if (line or line.isspace()) and (comment_begin == -1 or comment_begin != node.col_offset):
+            if (line and not line.isspace()) and (comment_begin == -1 or comment_begin != node.col_offset):
                 break
 
             preceding_comments.append((node_start - offset, line, node.col_offset))
@@ -297,7 +297,7 @@ class PreciseEmptyLinesUnparser(PreciseUnparser):
 
         for offset, line in enumerate(lines[node_end:], 1):
             comment_begin = line.find("#")
-            if (line or line.isspace()) and (comment_begin == -1 or comment_begin != node.col_offset):
+            if (line and not line.isspace()) and (comment_begin == -1 or comment_begin != node.col_offset):
                 break
 
             _write_if_unseen_comment(
