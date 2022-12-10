@@ -300,8 +300,7 @@ def test_precise_empty_lines_unparser_indented_literals():
     assert base.unparse(tree) + "\n" == expected_src
 
 def test_precise_empty_lines_unparser_comments():
-    #source = textwrap.dedent(
-    source = (
+    source = textwrap.dedent(
         """\
 def foo():
 # unindented comment

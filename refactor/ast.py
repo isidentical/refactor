@@ -297,7 +297,7 @@ class PreciseEmptyLinesUnparser(PreciseUnparser):
 
         for offset, line in enumerate(lines[node_end:], 1):
             comment_begin = line.find("#")
-            if (line and not line.isspace()) and (comment_begin == -1 or comment_begin != node.col_offset):
+            if comment_begin == -1 or comment_begin != node.col_offset:
                 break
 
             _write_if_unseen_comment(
