@@ -195,8 +195,56 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
         return (self.node, 1)
 
 
+@_hint("deprecated_alias", "NewStatementAction")
+@dataclass
+class LazyInsertBefore(_LazyActionMixin[ast.stmt, ast.stmt]):
+    """Inserts the re-synthesized version :py:meth:`LazyInsertBefore.build`'s
+    output right before the given `node`.
+
+    .. note::
+        Subclasses of :py:class:`LazyInsertBefore` must override
+        :py:meth:`LazyInsertBefore.build`.
+
+    .. note::
+        This action requires both the `node` and the built target to be statements.
+    """
+
+    def apply(self, context: Context, source: str) -> str:
+        lines = split_lines(source, encoding=context.file_info.get_encoding())
+        indentation, start_prefix = find_indent(
+            lines[self.node.lineno - 1][: self.node.col_offset]
+        )
+
+        replacement = split_lines(context.unparse(self.build()))
+        replacement.apply_indentation(indentation, start_prefix=start_prefix)
+
+        original_node_start = cast(int, self.node.lineno)
+        if lines[original_node_start].endswith(lines._newline_type):
+            replacement[-1] += lines._newline_type
+        else:
+            # If the original anchor's last line doesn't end with a newline,
+            # then we need to also prevent our new source from ending with
+            # a newline.
+            replacement[0] = lines._newline_type + replacement[0]
+
+        for line in reversed(replacement):
+            lines.insert(original_node_start - 1, line)
+
+        return lines.join()
+
+    def _stack_effect(self) -> tuple[ast.AST, int]:
+        # Adding a statement right after the node will need to be reflected
+        # in the block.
+        return (self.node, 1)
+
+
 @dataclass
 class NewStatementAction(LazyInsertAfter, _DeprecatedAliasMixin):
+    ...
+
+
+@dataclass
+class NewStatementBeforeAction(LazyInsertBefore, _DeprecatedAliasMixin):
     ...
 
 
@@ -216,8 +264,29 @@ class InsertAfter(LazyInsertAfter):
         return self.target
 
 
+@_hint("deprecated_alias", "TargetedNewStatementBeforeAction")
+@dataclass
+class InsertBefore(LazyInsertBefore):
+    """Inserts the re-synthesized version of given `target` right after
+    the given `node`.
+
+    .. note::
+        This action requires both the `node` and `target` to be a statements.
+    """
+
+    target: ast.stmt
+
+    def build(self) -> ast.stmt:
+        return self.target
+
+
 @dataclass
 class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
+    ...
+
+
+@dataclass
+class TargetedNewStatementBeforeAction(InsertBefore, _DeprecatedAliasMixin):
     ...
 
 

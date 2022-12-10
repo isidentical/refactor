@@ -14,6 +14,8 @@ from refactor import BaseAction, Rule, Session, common, context
 from refactor.actions import (
     Erase,
     EraseOrReplace,
+    InsertBefore,
+    LazyInsertBefore,
     InsertAfter,
     LazyInsertAfter,
     LazyReplace,
@@ -184,6 +186,19 @@ class AddNewImport(LazyInsertAfter):
 
 
 @dataclass
+class AddNewImportBefore(LazyInsertBefore):
+    module: str
+    names: list[str]
+
+    def build(self):
+        return ast.ImportFrom(
+            level=0,
+            module=self.module,
+            names=[ast.alias(name) for name in self.names],
+        )
+
+
+@dataclass
 class ModifyExistingImport(LazyReplace):
     name: str
 
@@ -245,6 +260,66 @@ class TypingAutoImporter(Rule):
         if len(typing_imports) == 0:
             last_import = self.find_last_import(self.context.tree)
             return AddNewImport(last_import, "typing", [node.id])
+
+        assert len(typing_imports) >= 1
+        assert node.id not in typing_imports
+
+        closest_import = common.find_closest(node, *typing_imports.values())
+        return ModifyExistingImport(closest_import, node.id)
+
+
+class TypingAutoImporterBefore(Rule):
+    INPUT_SOURCE = """
+    import lol
+    from something import another
+
+    def foo(items: List[Optional[str]]) -> Dict[str, List[Tuple[int, ...]]]:
+        class Something:
+            no: Iterable[int]
+
+            def bar(self, context: Dict[str, int]) -> List[int]:
+                print(1)
+    """
+
+    EXPECTED_SOURCE = """
+    import lol
+    from typing import Dict, List, Iterable, Optional, Tuple
+    from something import another
+
+    def foo(items: List[Optional[str]]) -> Dict[str, List[Tuple[int, ...]]]:
+        class Something:
+            no: Iterable[int]
+
+            def bar(self, context: Dict[str, int]) -> List[int]:
+                print(1)
+    """
+
+    context_providers = (ImportFinder, context.Scope)
+
+    def find_last_import(self, tree):
+        assert isinstance(tree, ast.Module)
+        for index, node in enumerate(tree.body, -1):
+            if isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant):
+                continue
+            elif isinstance(node, (ast.Import, ast.ImportFrom)):
+                continue
+            else:
+                break
+
+        return tree.body[index]
+
+    def match(self, node):
+        assert isinstance(node, ast.Name)
+        assert isinstance(node.ctx, ast.Load)
+        assert node.id in typing.__all__
+        assert not node.id.startswith("__")
+
+        scope = self.context["scope"].resolve(node)
+        typing_imports = self.context["import_finder"].collect("typing", scope=scope)
+
+        if len(typing_imports) == 0:
+            last_import = self.find_last_import(self.context.tree)
+            return AddNewImportBefore(last_import, "typing", [node.id])
 
         assert len(typing_imports) >= 1
         assert node.id not in typing_imports
@@ -948,6 +1023,7 @@ class AtomicTryBlock(Rule):
         ReplacePlaceholders,
         PropagateConstants,
         TypingAutoImporter,
+        TypingAutoImporterBefore,
         MakeFunctionAsync,
         OnlyKeywordArgumentDefaultNotSetCheckRule,
         InternalizeFunctions,
