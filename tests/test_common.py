@@ -137,6 +137,24 @@ def test_get_positions():
     assert position_for(right_node) == (3, 23, 3, 25)
 
 
+def test_get_positions_with_decorator():
+    source = textwrap.dedent(
+        """\
+    @deco0
+    @deco1(arg0,
+           arg1)
+    def func():
+        if a > 5:
+            return 5 + 3 + 25
+        elif b > 10:
+            return 1 + 3 + 5 + 7
+    """
+    )
+    tree = ast.parse(source)
+    right_node = tree.body[0].body[0].body[0].value.right
+    assert position_for(right_node) == (6, 23, 6, 25)
+
+
 def test_singleton():
     from dataclasses import dataclass
 
