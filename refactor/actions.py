@@ -132,7 +132,7 @@ class LazyReplace(_ReplaceCodeSegmentAction, _LazyActionMixin[ast.AST, ast.AST])
         lineno, col_offset, end_lineno, end_col_offset = position_for(self.node)
         # Add the decorators to the segment span to resolve an issue with def -> async def
         if hasattr(self.node, "decorator_list") and len(getattr(self.node, "decorator_list")) > 0:
-            lineno = position_for(getattr(self.node, "decorator_list")[0])[0]
+            lineno, _, _, _ = position_for(getattr(self.node, "decorator_list")[0])
         return lineno, col_offset, end_lineno, end_col_offset
 
     def _resynthesize(self, context: Context) -> str:
@@ -280,8 +280,8 @@ class Erase(_ReplaceCodeSegmentAction):
     def _get_decorated_segment_span(self, context: Context) -> PositionType:
         lineno, col_offset, end_lineno, end_col_offset = position_for(self.node)
         # Add the decorators to the segment span to resolve an issue with def -> async def
-        if hasattr(self.node, "decorator_list") and len(self.node["decorator_list"]) > 0:
-            lineno = position_for(self.node["decorator_list"][0])[0]
+        if hasattr(self.node, "decorator_list") and len(getattr(self.node, "decorator_list")) > 0:
+            lineno, _, _, _ = position_for(getattr(self.node, "decorator_list")[0])
         return lineno, col_offset, end_lineno, end_col_offset
 
     def _resynthesize(self, context: Context) -> str:
