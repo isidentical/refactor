@@ -65,7 +65,9 @@ class Lines(UserList[StringType]):
         """
 
         def _is_original(i: int) -> bool:
-            return index < len(source_data) and str(self.data[i]) == find_common_chars(str(self.data[i]), str(source_data[i].data))
+            common_chars: str = find_common_chars(str(self.data[i]), str(source_data[i].data))
+            is_multiline_string: int = str(self.data[i]).find(common_chars) == 0 and common_chars in ["'''", '"""']
+            return i < len(source_data) and (str(self.data[i]) == common_chars or is_multiline_string)
 
         for index, line in enumerate(self.data):
             if index == 0:
