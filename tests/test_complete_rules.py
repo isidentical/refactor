@@ -967,8 +967,6 @@ class AtomicTryBlock(Rule):
             new_trys.append(new_try)
 
         first_try, *remaining_trys = new_trys
-        print(ast.unparse(node))
-        print(ast.unparse(first_try))
         yield Replace(node, first_try)
         for remaining_try in reversed(remaining_trys):
             yield InsertAfter(node, remaining_try)

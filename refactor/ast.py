@@ -10,10 +10,12 @@ from collections.abc import Generator, Iterator
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, List
+from os.path import commonprefix
+from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, List, Tuple
+
+from refactor.common import find_indent
 
 from refactor import common
-from refactor.common import find_common_chars
 
 DEFAULT_ENCODING = "utf-8"
 
@@ -33,46 +35,31 @@ class Lines(UserList[StringType]):
         """Return the combined source code."""
         return "".join(map(str, self.lines))
 
-    def apply_indentation(
+    def apply_source_formatting(
         self,
-        indentation: StringType,
+        source_lines: Lines,
         *,
-        start_prefix: AnyStringType = "",
-        end_suffix: AnyStringType = "",
+        markers: Tuple[int, int, int | None] = None,
     ) -> None:
-        """Apply the given indentation, optionally with start and end prefixes
-        to the bound source lines."""
+        """Apply the indentation from source_lines when the first several characters match
+
+        :param source_lines: Original lines in source code
+        :param markers: Indentation and prefix parameters. Tuple of (start line, col_offset, end_suffix | None)
+        """
+
+        def not_original(i: int) -> bool:
+            common_chars: str = commonprefix([str(self.data[i]), str(source_lines.data[i].data)])
+            is_multiline_string: int = str(self.data[i]).find(common_chars) == 0 and common_chars in ["'''", '"""']
+            return not (i < len(source_lines.data) and (str(self.data[i]) == common_chars or is_multiline_string))
+
+        indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
+        end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
 
         for index, line in enumerate(self.data):
+            indentation = indentation if not_original(index) else ""
             if index == 0:
                 self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
             else:
-                self.data[index] = indentation + line  # type: ignore
-
-        if len(self.data) >= 1:
-            self.data[-1] += str(end_suffix)  # type: ignore
-
-    def apply_indentation_from_source(
-        self,
-        indentation: StringType,
-        source_data: List[StringType],
-        *,
-        start_prefix: AnyStringType = "",
-        end_suffix: AnyStringType = "",
-    ) -> None:
-        """Apply the given indentation only if the corresponding line in the source is different,
-        optionally with start and end prefixes to the bound source lines.
-        """
-
-        def _is_original(i: int) -> bool:
-            common_chars: str = find_common_chars(str(self.data[i]), str(source_data[i].data))
-            is_multiline_string: int = str(self.data[i]).find(common_chars) == 0 and common_chars in ["'''", '"""']
-            return i < len(source_data) and (str(self.data[i]) == common_chars or is_multiline_string)
-
-        for index, line in enumerate(self.data):
-            if index == 0:
-                self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
-            elif not _is_original(index):
                 self.data[index] = indentation + line  # type: ignore
 
         if len(self.data) >= 1:
