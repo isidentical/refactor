@@ -7,7 +7,7 @@ import tokenize
 import pytest
 
 from refactor import common
-from refactor.ast import BaseUnparser, PreciseUnparser, split_lines, PreciseEmptyLinesUnparser
+from refactor.ast import BaseUnparser, PreciseUnparser, split_lines
 
 
 def test_split_lines():
@@ -69,7 +69,7 @@ def test_split_lines_with_encoding(case):
         else:
             start_line = lines[lineno][col_offset:]
             end_line = lines[end_lineno][:end_col_offset]
-            match = start_line + lines[lineno + 1 : end_lineno].join() + end_line
+            match = start_line + lines[lineno + 1: end_lineno].join() + end_line
 
         assert str(match) == ast.get_source_segment(case, node)
 
@@ -242,7 +242,6 @@ def test_precise_unparser_comments():
     assert base.unparse(tree) + "\n" == expected_src
 
 
-
 def test_precise_empty_lines_unparser():
     source = textwrap.dedent(
         """\
@@ -268,7 +267,7 @@ def test_precise_empty_lines_unparser():
     tree = ast.parse(source)
     tree.body[0].body[0].body[0].value.args.append(ast.Constant(3))
 
-    base = PreciseEmptyLinesUnparser(source=source)
+    base = PreciseUnparser(source=source, empty_lines=True)
     assert base.unparse(tree) + "\n" == expected_src
 
 
@@ -296,8 +295,9 @@ def test_precise_empty_lines_unparser_indented_literals():
     tree = ast.parse(source)
     tree.body[0].body[0].body[0].value.args.append(ast.Constant(3))
 
-    base = PreciseEmptyLinesUnparser(source=source)
+    base = PreciseUnparser(source=source, empty_lines=True)
     assert base.unparse(tree) + "\n" == expected_src
+
 
 def test_precise_empty_lines_unparser_comments():
     source = textwrap.dedent(
@@ -348,5 +348,5 @@ def foo():
     # # Remove the print(d)
     tree.body[0].body.pop()
 
-    base = PreciseEmptyLinesUnparser(source=source)
+    base = PreciseUnparser(source=source, empty_lines=True)
     assert base.unparse(tree) + "\n" == expected_src
