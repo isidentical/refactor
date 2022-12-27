@@ -175,6 +175,10 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
         replacement = split_lines(context.unparse(self.build()))
         replacement.apply_indentation(indentation, start_prefix=start_prefix)
 
+        if self.separator:
+            # Adding extra separating line
+            replacement.insert(0, lines._newline_type)
+
         original_node_end = cast(int, self.node.end_lineno) - 1
         if lines[original_node_end].endswith(lines._newline_type):
             replacement[-1] += lines._newline_type
@@ -211,6 +215,7 @@ class InsertAfter(LazyInsertAfter):
     """
 
     target: ast.stmt
+    separator: bool = False
 
     def build(self) -> ast.stmt:
         return self.target
