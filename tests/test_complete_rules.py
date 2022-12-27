@@ -176,7 +176,7 @@ class ImportFinder(Representative):
 class AddNewImport(LazyInsertAfter):
     module: str
     names: list[str]
-    separator: bool
+    separator: bool = False
 
     def build(self):
         return ast.ImportFrom(
@@ -190,7 +190,7 @@ class AddNewImport(LazyInsertAfter):
 class AddNewImportBefore(LazyInsertBefore):
     module: str
     names: list[str]
-    separator: bool
+    separator: bool = False
 
     def build(self):
         return ast.ImportFrom(
@@ -261,7 +261,7 @@ class TypingAutoImporter(Rule):
 
         if len(typing_imports) == 0:
             last_import = self.find_last_import(self.context.tree)
-            return AddNewImport(last_import, "typing", [node.id], separator=False)
+            return AddNewImport(last_import, "typing", [node.id])
 
         assert len(typing_imports) >= 1
         assert node.id not in typing_imports
@@ -321,7 +321,7 @@ class TypingAutoImporterBefore(Rule):
 
         if len(typing_imports) == 0:
             last_import = self.find_last_import(self.context.tree)
-            return AddNewImportBefore(last_import, "typing", [node.id], separator=False)
+            return AddNewImportBefore(last_import, "typing", [node.id])
 
         assert len(typing_imports) >= 1
         assert node.id not in typing_imports
