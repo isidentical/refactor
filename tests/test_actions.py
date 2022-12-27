@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import textwrap
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, cast
 
@@ -9,7 +10,7 @@ import pytest
 from refactor.ast import DEFAULT_ENCODING
 
 from refactor import Session, common
-from refactor.actions import Erase, InvalidActionError, InsertAfter, Replace, InsertBefore
+from refactor.actions import Erase, InvalidActionError, InsertAfter, Replace, InsertBefore, LazyInsertAfter, LazyInsertBefore
 from refactor.context import Context
 from refactor.core import Rule
 
@@ -48,6 +49,14 @@ with x as y:
 INVALID_ERASES_TREE = ast.parse(INVALID_ERASES)
 
 
+@dataclass
+class BuildInsertAfterBottom(LazyInsertAfter):
+    separator: bool
+    def build(self) -> ast.Await:
+        await_st = ast.parse("await async_test()")
+        return await_st
+
+
 class TestInsertAfterBottom(Rule):
     INPUT_SOURCE = """
         try:
@@ -76,6 +85,90 @@ class TestInsertAfterBottom(Rule):
         yield Replace(node, cast(ast.AST, new_try))
 
 
+class TestInsertAfterBottomWithBuild(Rule):
+    INPUT_SOURCE = """
+        try:
+            base_tree = get_tree(base_file, module_name)
+            first_tree = get_tree(first_tree, module_name)
+            second_tree = get_tree(second_tree, module_name)
+            third_tree = get_tree(third_tree, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue"""
+
+    EXPECTED_SOURCE = """
+        try:
+            base_tree = get_tree(base_file, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue
+        await async_test()"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertAfter]:
+        assert isinstance(node, ast.Try)
+        assert len(node.body) >= 2
+
+        yield BuildInsertAfterBottom(node, separator=False)
+        new_try = common.clone(node)
+        new_try.body = [node.body[0]]
+        yield Replace(node, cast(ast.AST, new_try))
+
+
+class TestInsertAfterBottomWithSeparator(Rule):
+    INPUT_SOURCE = """
+        try:
+            base_tree = get_tree(base_file, module_name)
+            first_tree = get_tree(first_tree, module_name)
+            second_tree = get_tree(second_tree, module_name)
+            third_tree = get_tree(third_tree, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue"""
+
+    EXPECTED_SOURCE = """
+        try:
+            base_tree = get_tree(base_file, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue
+
+        await async_test()"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertAfter]:
+        assert isinstance(node, ast.Try)
+        assert len(node.body) >= 2
+
+        await_st = ast.parse("await async_test()")
+        yield InsertAfter(node, cast(ast.stmt, await_st), separator=True)
+        new_try = common.clone(node)
+        new_try.body = [node.body[0]]
+        yield Replace(node, cast(ast.AST, new_try))
+
+
+class TestInsertAfterBottomWithSeparatorWithBuild(Rule):
+    INPUT_SOURCE = """
+        try:
+            base_tree = get_tree(base_file, module_name)
+            first_tree = get_tree(first_tree, module_name)
+            second_tree = get_tree(second_tree, module_name)
+            third_tree = get_tree(third_tree, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue"""
+
+    EXPECTED_SOURCE = """
+        try:
+            base_tree = get_tree(base_file, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue
+
+        await async_test()"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertAfter]:
+        assert isinstance(node, ast.Try)
+        assert len(node.body) >= 2
+
+        yield BuildInsertAfterBottom(node, separator=True)
+        new_try = common.clone(node)
+        new_try.body = [node.body[0]]
+        yield Replace(node, cast(ast.AST, new_try))
+
+
 class TestInsertBeforeTop(Rule):
     INPUT_SOURCE = """
         try:
@@ -99,6 +192,35 @@ class TestInsertBeforeTop(Rule):
 
         await_st = ast.parse("await async_test()")
         yield InsertBefore(node, cast(ast.stmt, await_st))
+        new_try = common.clone(node)
+        new_try.body = [node.body[0]]
+        yield Replace(node, cast(ast.AST, new_try))
+
+
+class TestInsertBeforeTopWithSeparator(Rule):
+    INPUT_SOURCE = """
+        try:
+            base_tree = get_tree(base_file, module_name)
+            first_tree = get_tree(first_tree, module_name)
+            second_tree = get_tree(second_tree, module_name)
+            third_tree = get_tree(third_tree, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue"""
+
+    EXPECTED_SOURCE = """
+        await async_test()
+
+        try:
+            base_tree = get_tree(base_file, module_name)
+        except (SyntaxError, FileNotFoundError):
+            continue"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertBefore]:
+        assert isinstance(node, ast.Try)
+        assert len(node.body) >= 2
+
+        await_st = ast.parse("await async_test()")
+        yield InsertBefore(node, cast(ast.stmt, await_st), separator=True)
         new_try = common.clone(node)
         new_try.body = [node.body[0]]
         yield Replace(node, cast(ast.AST, new_try))
@@ -489,7 +611,11 @@ def test_erase_invalid(invalid_node):
     "rule",
     [
         TestInsertAfterBottom,
+        TestInsertAfterBottomWithBuild,
+        TestInsertAfterBottomWithSeparator,
+        TestInsertAfterBottomWithSeparatorWithBuild,
         TestInsertBeforeTop,
+        TestInsertBeforeTopWithSeparator,
         TestInsertAfter,
         TestInsertBefore,
         TestInsertAfterThenBefore,
