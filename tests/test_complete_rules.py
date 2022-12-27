@@ -174,6 +174,7 @@ class ImportFinder(Representative):
 class AddNewImport(LazyInsertAfter):
     module: str
     names: list[str]
+    separator: bool = False
 
     def build(self):
         return ast.ImportFrom(
