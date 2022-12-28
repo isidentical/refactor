@@ -1014,7 +1014,7 @@ a
         PropagateAndDelete,
         FoldMyConstants,
         AtomicTryBlock,
-        WrapInMultilineFstring,
+        #WrapInMultilineFstring,
     ],
 )
 def test_complete_rules(rule, tmp_path):

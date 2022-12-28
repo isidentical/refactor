@@ -3,11 +3,13 @@ from __future__ import annotations
 import ast
 import textwrap
 import tokenize
+from pathlib import Path
 
 import pytest
+from refactor.common import position_for, clone
 
-from refactor import common
-from refactor.ast import BaseUnparser, PreciseUnparser, split_lines
+from refactor import common, Rule, Session, Replace, Context
+from refactor.ast import BaseUnparser, PreciseUnparser, split_lines, DEFAULT_ENCODING
 
 
 def test_split_lines():
@@ -69,7 +71,7 @@ def test_split_lines_with_encoding(case):
         else:
             start_line = lines[lineno][col_offset:]
             end_line = lines[end_lineno][:end_col_offset]
-            match = start_line + lines[lineno + 1 : end_lineno].join() + end_line
+            match = start_line + lines[lineno + 1: end_lineno].join() + end_line
 
         assert str(match) == ast.get_source_segment(case, node)
 
@@ -169,6 +171,7 @@ def test_precise_unparser_indented_literals():
         """\
     def func():
         if something:
+            # On change, comments are removed
             print(
                 "bleh"
                 "zoom"
@@ -240,3 +243,321 @@ def test_precise_unparser_comments():
 
     base = PreciseUnparser(source=source)
     assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_unparser_custom_indent_no_changes():
+    source = """def func():
+    if something:
+        # Arguments have custom indentation
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        # Arguments have custom indentation
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    tree = ast.parse(source)
+
+    base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_unparser_custom_indent_del():
+    source = """def func():
+    if something:
+        # Arguments have custom indentation
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        print(call(.1), maybe+something_else_that_is_very_very_very_long, thing   . a)
+"""
+
+    tree = ast.parse(source)
+    del tree.body[0].body[0].body[0].value.args[2]
+
+    base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_apply_source_formatting_maintains_with_await_0():
+    source = """def func():
+    if something:
+        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        print(
+              call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        await print(
+              call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    source_lines = split_lines(source)
+    source_tree = ast.parse(source)
+    source_tree = ast.fix_missing_locations(source_tree)
+
+    context = Context(source, source_tree)
+
+    awaited_print = source_tree
+    awaited_print.body[0].body[0].body[0] = ast.Expr(ast.Await(source_tree.body[0].body[0].body[0].value))
+
+    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
+    replacement = split_lines(context.unparse(awaited_print))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    assert replacement.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_await_1():
+    source = """def func():
+    if something:
+        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        await print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    source_lines = split_lines(source)
+    source_tree = ast.parse(source)
+    source_tree = ast.fix_missing_locations(source_tree)
+
+    context = Context(source, source_tree)
+
+    awaited_print = source_tree
+    awaited_print.body[0].body[0].body[0] = ast.Expr(ast.Await(source_tree.body[0].body[0].body[0].value))
+
+    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
+    replacement = split_lines(context.unparse(awaited_print))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    assert replacement.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_call():
+    source = """def func():
+    if something:
+        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        call_instead(print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        ))
+"""
+
+    source_lines = split_lines(source)
+    source_tree = ast.parse(source)
+    source_tree = ast.fix_missing_locations(source_tree)
+
+    context = Context(source, source_tree)
+
+    call_instead_print = source_tree
+    call = ast.Call(func=ast.Name(id="call_instead"), args=[call_instead_print.body[0].body[0].body[0].value], keywords=[])
+    call_instead_print.body[0].body[0].body[0].value = call
+
+    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
+    replacement = split_lines(context.unparse(call_instead_print))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    assert replacement.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_call_on_closing_parens():
+    source = """def func():
+    if something:
+        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+          ) # This is mis-aligned
+"""
+
+    expected_src = """def func():
+    if something:
+        call_instead(print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+          )) # This is mis-aligned
+"""
+
+    source_lines = split_lines(source)
+    source_tree = ast.parse(source)
+    source_tree = ast.fix_missing_locations(source_tree)
+
+    context = Context(source, source_tree)
+
+    call_instead_print = source_tree
+    call = ast.Call(func=ast.Name(id="call_instead"), args=[call_instead_print.body[0].body[0].body[0].value], keywords=[])
+    call_instead_print.body[0].body[0].body[0].value = call
+
+    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
+    replacement = split_lines(context.unparse(call_instead_print))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    assert replacement.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_async():
+    source = """def func():
+    if something:
+        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        with print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        ) as p:
+            do_something()
+"""
+
+    expected_src = """def func():
+    if something:
+        async with print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        ) as p:
+            do_something()
+"""
+
+    source_lines = split_lines(source)
+    source_tree = ast.parse(source)
+    source_tree = ast.fix_missing_locations(source_tree)
+
+    context = Context(source, source_tree)
+
+    async_with = source_tree
+    aw = clone(async_with.body[0].body[0].body[0])
+    aw.__class__ = ast.AsyncWith
+    async_with.body[0].body[0].body[0] = aw
+
+    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
+    replacement = split_lines(context.unparse(async_with))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    assert replacement.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_fstring():
+    source = '''
+def f():
+    return """
+a
+"""
+'''
+
+    expected_src = '''
+def f():
+    return F("""
+a
+""")
+'''
+
+    source_lines = split_lines(source)
+    source_tree = ast.parse(source)
+    source_tree = ast.fix_missing_locations(source_tree)
+
+    context = Context(source, source_tree)
+
+    f_string = source_tree
+    call = ast.Call(func=ast.Name(id="F"), args=[f_string.body[0].body[0].value], keywords=[])
+    f_string.body[0].body[0].value = call
+
+    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
+    replacement = split_lines(context.unparse(f_string))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(1, col_offset, end_col_offset),
+    )
+    # Not sure why there are '\n' mismatches
+    assert "\n" + replacement.join() == expected_src
+
+
+def test_apply_source_formatting_does_not_with_change():
+    source = """def func():
+    if something:
+        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        await print(call(.1), maybe+something_else_that_is_very_very_very_long, thing   . a)
+"""
+
+    source_lines = split_lines(source)
+    source_tree = ast.parse(source)
+    source_tree = ast.fix_missing_locations(source_tree)
+
+    context = Context(source, source_tree)
+
+    awaited_print = source_tree
+    del awaited_print.body[0].body[0].body[0].value.args[2]
+    awaited_print.body[0].body[0].body[0] = ast.Expr(ast.Await(source_tree.body[0].body[0].body[0].value))
+
+    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
+    replacement = split_lines(context.unparse(awaited_print))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    assert replacement.join() == expected_src

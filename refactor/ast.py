@@ -36,10 +36,10 @@ class Lines(UserList[StringType]):
         return "".join(map(str, self.lines))
 
     def apply_source_formatting(
-        self,
-        source_lines: Lines,
-        *,
-        markers: Tuple[int, int, int | None] = None,
+            self,
+            source_lines: Lines,
+            *,
+            markers: Tuple[int, int, int | None] = None,
     ) -> None:
         """Apply the indentation from source_lines when the first several characters match
 
@@ -47,21 +47,21 @@ class Lines(UserList[StringType]):
         :param markers: Indentation and prefix parameters. Tuple of (start line, col_offset, end_suffix | None)
         """
 
-        def not_original(i: int) -> bool:
-            common_chars: str = commonprefix([str(self.data[i]), str(source_lines.data[i].data)])
-            is_multiline_string: int = str(self.data[i]).find(common_chars) == 0 and common_chars in ["'''", '"""']
-            return not (i < len(source_lines.data) and (str(self.data[i]) == common_chars or is_multiline_string))
-
         indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
         end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
 
         for index, line in enumerate(self.data):
-            indentation = indentation if not_original(index) else ""
+            if index < len(source_lines):
+                original_line = source_lines[index]
+            else:
+                original_line = None
+
             if index == 0:
                 self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
+            elif original_line is not None and original_line.startswith(line):
+                self.data[index] = line  # type: ignore
             else:
                 self.data[index] = indentation + line  # type: ignore
-
         if len(self.data) >= 1:
             self.data[-1] += str(end_suffix)  # type: ignore
 
@@ -91,7 +91,7 @@ class SourceSegment(UserString):
             # re-implements the direct indexing as slicing (e.g. a[1] is a[1:2], with
             # error handling).
             direct_index = operator.index(index)
-            view = raw_line[direct_index : direct_index + 1].decode(
+            view = raw_line[direct_index: direct_index + 1].decode(
                 encoding=self.encoding
             )
             if not view:
@@ -214,9 +214,9 @@ class PreciseUnparser(BaseUnparser):
     @contextmanager
     def _collect_stmt_comments(self, node: ast.AST) -> Iterator[None]:
         def _write_if_unseen_comment(
-            line_no: int,
-            line: str,
-            comment_begin: int,
+                line_no: int,
+                line: str,
+                comment_begin: int,
         ) -> None:
             if line_no in self._visited_comment_lines:
                 # We have already written this comment as the
