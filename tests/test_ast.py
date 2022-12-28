@@ -298,7 +298,7 @@ def test_precise_unparser_custom_indent_del():
 def test_apply_source_formatting_maintains_with_await_0():
     source = """def func():
     if something:
-        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        # Comments are retrieved
         print(
               call(.1),
               maybe+something_else_that_is_very_very_very_long,
@@ -309,6 +309,7 @@ def test_apply_source_formatting_maintains_with_await_0():
 
     expected_src = """def func():
     if something:
+        # Comments are retrieved
         await print(
               call(.1),
               maybe+something_else_that_is_very_very_very_long,
@@ -316,29 +317,31 @@ def test_apply_source_formatting_maintains_with_await_0():
               thing   . a
         )
 """
-
-    source_lines = split_lines(source)
     source_tree = ast.parse(source)
-    source_tree = ast.fix_missing_locations(source_tree)
-
     context = Context(source, source_tree)
 
-    awaited_print = source_tree
-    awaited_print.body[0].body[0].body[0] = ast.Expr(ast.Await(source_tree.body[0].body[0].body[0].value))
+    node_to_replace = source_tree.body[0].body[0].body[0].value
 
-    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
-    replacement = split_lines(context.unparse(awaited_print))
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Await(node_to_replace)
+    replacement = split_lines(context.unparse(new_node))
     replacement.apply_source_formatting(
         source_lines=source_lines,
         markers=(0, col_offset, end_col_offset),
     )
-    assert replacement.join() == expected_src
+    lines[view] = replacement
+    assert lines.join() == expected_src
 
 
 def test_apply_source_formatting_maintains_with_await_1():
     source = """def func():
     if something:
-        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        # Comments are retrieved
         print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
@@ -348,35 +351,38 @@ def test_apply_source_formatting_maintains_with_await_1():
 
     expected_src = """def func():
     if something:
+        # Comments are retrieved
         await print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
               thing   . a
         )
 """
-
-    source_lines = split_lines(source)
     source_tree = ast.parse(source)
-    source_tree = ast.fix_missing_locations(source_tree)
-
     context = Context(source, source_tree)
 
-    awaited_print = source_tree
-    awaited_print.body[0].body[0].body[0] = ast.Expr(ast.Await(source_tree.body[0].body[0].body[0].value))
+    node_to_replace = source_tree.body[0].body[0].body[0].value
 
-    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
-    replacement = split_lines(context.unparse(awaited_print))
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Await(node_to_replace)
+    replacement = split_lines(context.unparse(new_node))
     replacement.apply_source_formatting(
         source_lines=source_lines,
         markers=(0, col_offset, end_col_offset),
     )
-    assert replacement.join() == expected_src
+    lines[view] = replacement
+    assert lines.join() == expected_src
 
 
 def test_apply_source_formatting_maintains_with_call():
     source = """def func():
     if something:
-        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        # Comments are retrieved
         print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
@@ -386,36 +392,38 @@ def test_apply_source_formatting_maintains_with_call():
 
     expected_src = """def func():
     if something:
+        # Comments are retrieved
         call_instead(print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
               thing   . a
         ))
 """
-
-    source_lines = split_lines(source)
     source_tree = ast.parse(source)
-    source_tree = ast.fix_missing_locations(source_tree)
-
     context = Context(source, source_tree)
 
-    call_instead_print = source_tree
-    call = ast.Call(func=ast.Name(id="call_instead"), args=[call_instead_print.body[0].body[0].body[0].value], keywords=[])
-    call_instead_print.body[0].body[0].body[0].value = call
+    node_to_replace = source_tree.body[0].body[0].body[0].value
 
-    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
-    replacement = split_lines(context.unparse(call_instead_print))
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Call(func=ast.Name(id="call_instead"), args=[node_to_replace], keywords=[])
+    replacement = split_lines(context.unparse(new_node))
     replacement.apply_source_formatting(
         source_lines=source_lines,
         markers=(0, col_offset, end_col_offset),
     )
-    assert replacement.join() == expected_src
+    lines[view] = replacement
+    assert lines.join() == expected_src
 
 
 def test_apply_source_formatting_maintains_with_call_on_closing_parens():
     source = """def func():
     if something:
-        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        # Comments are retrieved
         print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
@@ -425,36 +433,38 @@ def test_apply_source_formatting_maintains_with_call_on_closing_parens():
 
     expected_src = """def func():
     if something:
+        # Comments are retrieved
         call_instead(print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
               thing   . a
           )) # This is mis-aligned
 """
-
-    source_lines = split_lines(source)
     source_tree = ast.parse(source)
-    source_tree = ast.fix_missing_locations(source_tree)
-
     context = Context(source, source_tree)
 
-    call_instead_print = source_tree
-    call = ast.Call(func=ast.Name(id="call_instead"), args=[call_instead_print.body[0].body[0].body[0].value], keywords=[])
-    call_instead_print.body[0].body[0].body[0].value = call
+    node_to_replace = source_tree.body[0].body[0].body[0].value
 
-    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
-    replacement = split_lines(context.unparse(call_instead_print))
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Call(func=ast.Name(id="call_instead"), args=[node_to_replace], keywords=[])
+    replacement = split_lines(context.unparse(new_node))
     replacement.apply_source_formatting(
         source_lines=source_lines,
         markers=(0, col_offset, end_col_offset),
     )
-    assert replacement.join() == expected_src
+    lines[view] = replacement
+    assert lines.join() == expected_src
 
 
 def test_apply_source_formatting_maintains_with_async():
     source = """def func():
     if something:
-        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        # Comments are retrieved
         with print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
@@ -465,6 +475,7 @@ def test_apply_source_formatting_maintains_with_async():
 
     expected_src = """def func():
     if something:
+        # Comments are retrieved
         async with print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
@@ -472,66 +483,66 @@ def test_apply_source_formatting_maintains_with_async():
         ) as p:
             do_something()
 """
-
-    source_lines = split_lines(source)
     source_tree = ast.parse(source)
-    source_tree = ast.fix_missing_locations(source_tree)
-
     context = Context(source, source_tree)
 
-    async_with = source_tree
-    aw = clone(async_with.body[0].body[0].body[0])
-    aw.__class__ = ast.AsyncWith
-    async_with.body[0].body[0].body[0] = aw
+    node_to_replace = source_tree.body[0].body[0].body[0]
 
-    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
-    replacement = split_lines(context.unparse(async_with))
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = clone(node_to_replace)
+    new_node.__class__ = ast.AsyncWith
+    replacement = split_lines(context.unparse(new_node))
     replacement.apply_source_formatting(
         source_lines=source_lines,
         markers=(0, col_offset, end_col_offset),
     )
-    assert replacement.join() == expected_src
+    lines[view] = replacement
+    assert lines.join() == expected_src
 
 
 def test_apply_source_formatting_maintains_with_fstring():
-    source = '''
-def f():
+    source = '''def f():
     return """
 a
 """
 '''
 
-    expected_src = '''
-def f():
+    expected_src = '''def f():
     return F("""
 a
 """)
 '''
 
-    source_lines = split_lines(source)
     source_tree = ast.parse(source)
-    source_tree = ast.fix_missing_locations(source_tree)
-
     context = Context(source, source_tree)
 
-    f_string = source_tree
-    call = ast.Call(func=ast.Name(id="F"), args=[f_string.body[0].body[0].value], keywords=[])
-    f_string.body[0].body[0].value = call
+    node_to_replace = source_tree.body[0].body[0].value
 
-    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
-    replacement = split_lines(context.unparse(f_string))
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Call(func=ast.Name(id="F"), args=[node_to_replace], keywords=[])
+    replacement = split_lines(context.unparse(new_node))
     replacement.apply_source_formatting(
         source_lines=source_lines,
-        markers=(1, col_offset, end_col_offset),
+        markers=(0, col_offset, end_col_offset),
     )
-    # Not sure why there are '\n' mismatches
-    assert "\n" + replacement.join() == expected_src
+    lines[view] = replacement
+    assert lines.join() == expected_src
 
 
 def test_apply_source_formatting_does_not_with_change():
     source = """def func():
     if something:
-        # Comments are not retrieved for a "new node". Maybe we need a "barely new" check?
+        # Comments are retrieved
         print(call(.1),
               maybe+something_else_that_is_very_very_very_long,
               maybe / other,
@@ -541,23 +552,27 @@ def test_apply_source_formatting_does_not_with_change():
 
     expected_src = """def func():
     if something:
+        # Comments are retrieved
         await print(call(.1), maybe+something_else_that_is_very_very_very_long, thing   . a)
 """
 
-    source_lines = split_lines(source)
     source_tree = ast.parse(source)
-    source_tree = ast.fix_missing_locations(source_tree)
-
     context = Context(source, source_tree)
 
-    awaited_print = source_tree
-    del awaited_print.body[0].body[0].body[0].value.args[2]
-    awaited_print.body[0].body[0].body[0] = ast.Expr(ast.Await(source_tree.body[0].body[0].body[0].value))
+    node_to_replace = source_tree.body[0].body[0].body[0].value
 
-    (_, col_offset, _, end_col_offset,) = position_for(source_tree.body[0])
-    replacement = split_lines(context.unparse(awaited_print))
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    del node_to_replace.args[2]
+    new_node = ast.Await(node_to_replace)
+    replacement = split_lines(context.unparse(new_node))
     replacement.apply_source_formatting(
         source_lines=source_lines,
         markers=(0, col_offset, end_col_offset),
     )
-    assert replacement.join() == expected_src
+    lines[view] = replacement
+    assert lines.join() == expected_src

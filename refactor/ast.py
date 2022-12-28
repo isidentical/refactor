@@ -10,12 +10,10 @@ from collections.abc import Generator, Iterator
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from os.path import commonprefix
-from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, List, Tuple
-
-from refactor.common import find_indent
+from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, Tuple
 
 from refactor import common
+from refactor.common import find_indent
 
 DEFAULT_ENCODING = "utf-8"
 
@@ -50,6 +48,7 @@ class Lines(UserList[StringType]):
         indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
         end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
 
+        original_line: str | None
         for index, line in enumerate(self.data):
             if index < len(source_lines):
                 original_line = source_lines[index]
@@ -58,7 +57,8 @@ class Lines(UserList[StringType]):
 
             if index == 0:
                 self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
-            elif original_line is not None and original_line.startswith(line):
+            # The updated line can have an extra wrapping in brackets
+            elif original_line is not None and original_line.startswith(line[:-1]):
                 self.data[index] = line  # type: ignore
             else:
                 self.data[index] = indentation + line  # type: ignore
