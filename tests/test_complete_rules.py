@@ -353,7 +353,7 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
         assert any(kw_default is None for kw_default in node.args.kw_defaults)
 
         if isinstance(node, ast.Lambda) and not (
-                isinstance(node.body, ast.Name) and isinstance(node.body.ctx, ast.Load)
+            isinstance(node.body, ast.Name) and isinstance(node.body.ctx, ast.Load)
         ):
             scope = self.context["scope"].resolve(node.body)
             scope.definitions.get(node.body.id, [])
@@ -362,8 +362,8 @@ class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
             for stmt in node.body:
                 for identifier in ast.walk(stmt):
                     if not (
-                            isinstance(identifier, ast.Name)
-                            and isinstance(identifier.ctx, ast.Load)
+                        isinstance(identifier, ast.Name)
+                        and isinstance(identifier.ctx, ast.Load)
                     ):
                         continue
 
@@ -629,13 +629,13 @@ class DownstreamAnalyzer(Representative):
     context_providers = (context.Scope,)
 
     def iter_dependents(
-            self, name: str, source: ast.Import | ast.ImportFrom
+        self, name: str, source: ast.Import | ast.ImportFrom
     ) -> Iterator[ast.Name]:
         for node in ast.walk(self.context.tree):
             if (
-                    isinstance(node, ast.Name)
-                    and isinstance(node.ctx, ast.Load)
-                    and node.id == name
+                isinstance(node, ast.Name)
+                and isinstance(node.ctx, ast.Load)
+                and node.id == name
             ):
                 node_scope = self.context.scope.resolve(node)
                 definitions = node_scope.get_definitions(name)
@@ -730,7 +730,7 @@ class RenameImportAndDownstream(Rule):
 
         [alias] = aliases
         for dependent in self.context.downstream_analyzer.iter_dependents(
-                alias.asname or alias.name, node
+            alias.asname or alias.name, node
         ):
             yield Replace(dependent, ast.Name("b", ast.Load()))
 
@@ -1000,20 +1000,20 @@ a
 @pytest.mark.parametrize(
     "rule",
     [
-        #ReplaceNexts,
-        #ReplacePlaceholders,
-        #PropagateConstants,
-        #TypingAutoImporter,
-        #MakeFunctionAsync,
-        #MakeCallAwait,
-        #OnlyKeywordArgumentDefaultNotSetCheckRule,
-        #InternalizeFunctions,
-        #RemoveDeadCode,
-        #RenameImportAndDownstream,
-        #AssertEncoder,
-        #PropagateAndDelete,
-        #FoldMyConstants,
-        #AtomicTryBlock,
+        ReplaceNexts,
+        ReplacePlaceholders,
+        PropagateConstants,
+        TypingAutoImporter,
+        MakeFunctionAsync,
+        MakeCallAwait,
+        OnlyKeywordArgumentDefaultNotSetCheckRule,
+        InternalizeFunctions,
+        RemoveDeadCode,
+        RenameImportAndDownstream,
+        AssertEncoder,
+        PropagateAndDelete,
+        FoldMyConstants,
+        AtomicTryBlock,
         WrapInMultilineFstring,
     ],
 )

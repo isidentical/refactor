@@ -34,10 +34,10 @@ class Lines(UserList[StringType]):
         return "".join(map(str, self.lines))
 
     def apply_source_formatting(
-            self,
-            source_lines: Lines,
-            *,
-            markers: Tuple[int, int, int | None] = None,
+        self,
+        source_lines: Lines,
+        *,
+        markers: Tuple[int, int, int | None] = None,
     ) -> None:
         """Apply the indentation from source_lines when the first several characters match
 
@@ -62,6 +62,7 @@ class Lines(UserList[StringType]):
                 self.data[index] = line  # type: ignore
             else:
                 self.data[index] = indentation + line  # type: ignore
+
         if len(self.data) >= 1:
             self.data[-1] += str(end_suffix)  # type: ignore
 
@@ -214,9 +215,9 @@ class PreciseUnparser(BaseUnparser):
     @contextmanager
     def _collect_stmt_comments(self, node: ast.AST) -> Iterator[None]:
         def _write_if_unseen_comment(
-                line_no: int,
-                line: str,
-                comment_begin: int,
+            line_no: int,
+            line: str,
+            comment_begin: int,
         ) -> None:
             if line_no in self._visited_comment_lines:
                 # We have already written this comment as the
