@@ -460,7 +460,7 @@ def test_apply_source_formatting_maintains_with_call_on_closing_parens():
     assert lines.join() == expected_src
 
 
-def test_apply_source_formatting_maintains_with_async():
+def test_apply_source_formatting_maintains_with_async_complex():
     source = """def func():
     if something:
         # Comments are retrieved
@@ -481,6 +481,44 @@ def test_apply_source_formatting_maintains_with_async():
               thing   . a
         ) as p:
             do_something()
+"""
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0]
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = clone(node_to_replace)
+    new_node.__class__ = ast.AsyncWith
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_async():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        with something: # comment2
+             a = 1 # Non-standard indent
+             b = 2 # Non-standard indent becomes standard
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        async with something:
+            a = 1
+            b = 2 # Non-standard indent becomes standard
 """
     source_tree = ast.parse(source)
     context = Context(source, source_tree)
