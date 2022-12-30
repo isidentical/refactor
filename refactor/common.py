@@ -2,12 +2,13 @@ from __future__ import annotations
 
 import ast
 import copy
+import re
 from collections import deque
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import cache, singledispatch, wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast, Set, List, Tuple
 
 if TYPE_CHECKING:
     from refactor.context import Context
@@ -199,6 +200,24 @@ def extract_from_text(text: str) -> ast.AST:
     """Extract the first AST node from the given ``text``'s
     parsed AST."""
     return ast.parse(text).body[0]
+
+
+def extract_str_difference(s1: str, s2: str, with_comments: bool = False) -> Tuple[Set[str], float]:
+    """Returns a set of "words" that are different between 2 strings"""
+    if not with_comments:
+        s1 = re.match(r'^([^#]*)', s1).group()
+        s2 = re.match(r'^([^#]*)', s2).group()
+    difference: Set[str] = set(s1.split()).symmetric_difference(s2.split())
+    count_changed_chars: int = 0
+    for w in difference:
+        count_changed_chars = count_changed_chars + len(w)
+    percentile_change: float = count_changed_chars / (len(s1 + s2))
+    return set(s1.split()).symmetric_difference(s2.split()), percentile_change
+
+
+def refactored_matching(s1: str, s2: str) -> Set[str]:
+    """Returns whether the changes in two strings can be considered minimal"""
+    return set(s1.split()).symmetric_difference(s2.split())
 
 
 _POSITIONAL_ATTRIBUTES = (
