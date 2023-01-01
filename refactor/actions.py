@@ -180,7 +180,6 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
 
         original_node_end = cast(int, self.node.end_lineno) - 1
         if lines[original_node_end].endswith(lines._newline_type):
-            pprint(replacement)
             replacement[-1] += lines._newline_type if not replacement[-1].endswith(lines._newline_type) else ""
         else:
             # If the original anchor's last line doesn't end with a newline,
@@ -214,13 +213,13 @@ class LazyInsertBefore(_LazyActionMixin[ast.stmt, ast.stmt]):
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source, encoding=context.file_info.get_encoding())
-        indentation, start_prefix = find_indent(
-            lines[self.node.lineno - 1][: self.node.col_offset]
-        )
 
         replacement = split_lines(context.unparse(self.build()))
-        replacement.apply_indentation(indentation, start_prefix=start_prefix)
-        replacement[-1] += lines._newline_type
+        replacement.apply_source_formatting(
+            source_lines=lines,
+            markers=(self.node.lineno - 1, self.node.col_offset, None),
+        )
+        replacement[-1] += lines._newline_type if not replacement[-1].endswith(lines._newline_type) else ""
 
         original_node_start = cast(int, self.node.lineno)
         for line in reversed(replacement):
