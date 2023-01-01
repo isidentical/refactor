@@ -177,6 +177,10 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
         replacement = split_lines(context.unparse(self.build()))
         replacement.apply_indentation(indentation, start_prefix=start_prefix)
 
+        if hasattr(self, "separator") and self.separator:
+            # Adding extra separating line
+            replacement.insert(0, lines._newline_type)
+
         original_node_end = cast(int, self.node.end_lineno) - 1
         if lines[original_node_end].endswith(lines._newline_type):
             replacement[-1] += lines._newline_type
@@ -220,6 +224,10 @@ class LazyInsertBefore(_LazyActionMixin[ast.stmt, ast.stmt]):
         replacement.apply_indentation(indentation, start_prefix=start_prefix)
         replacement[-1] += lines._newline_type
 
+        if hasattr(self, "separator") and self.separator:
+            # Adding extra separating line
+            replacement.append(lines._newline_type)
+
         original_node_start = cast(int, self.node.lineno)
         for line in reversed(replacement):
             lines.insert(original_node_start - 1, line)
@@ -253,6 +261,7 @@ class InsertAfter(LazyInsertAfter):
     """
 
     target: ast.stmt
+    separator: bool = False
 
     def build(self) -> ast.stmt:
         return self.target
@@ -268,6 +277,7 @@ class InsertBefore(LazyInsertBefore):
     """
 
     target: ast.stmt
+    separator: bool = False
 
     def build(self) -> ast.stmt:
         return self.target
