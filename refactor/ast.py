@@ -81,7 +81,6 @@ class Lines(UserList[StringType]):
              indentation,
              comments) = self.find_best_matching_source_line(line, source_lines[markers[0]:])
 
-            print(f">{line[:-1]}<")
             if original_line is not None:
                 # Remove the line indentation, collect comments
                 _, line, new_comments = find_indent_comments(line)
