@@ -69,7 +69,7 @@ def test_split_lines_with_encoding(case):
         else:
             start_line = lines[lineno][col_offset:]
             end_line = lines[end_lineno][:end_col_offset]
-            match = start_line + lines[lineno + 1 : end_lineno].join() + end_line
+            match = start_line + lines[lineno + 1: end_lineno].join() + end_line
 
         assert str(match) == ast.get_source_segment(case, node)
 
@@ -239,4 +239,114 @@ def test_precise_unparser_comments():
     tree.body[0].body.pop()
 
     base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_empty_lines_unparser():
+    source = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print(
+                call(.1),
+                maybe+something_else,
+                maybe / other,
+                thing   . a
+            )
+    """
+    )
+
+    expected_src = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print(call(.1), maybe+something_else, maybe / other, thing   . a, 3)
+    """
+    )
+
+    tree = ast.parse(source)
+    tree.body[0].body[0].body[0].value.args.append(ast.Constant(3))
+
+    base = PreciseUnparser(source=source, empty_lines=True)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_empty_lines_unparser_indented_literals():
+    source = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print(
+                "bleh"
+                "zoom"
+            )
+    """
+    )
+
+    expected_src = textwrap.dedent(
+        """\
+    def func():
+        if something:
+            print("bleh"
+                "zoom", 3)
+    """
+    )
+
+    tree = ast.parse(source)
+    tree.body[0].body[0].body[0].value.args.append(ast.Constant(3))
+
+    base = PreciseUnparser(source=source, empty_lines=True)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_empty_lines_unparser_comments():
+    source = textwrap.dedent(
+        """\
+def foo():
+# unindented comment
+    # indented but not connected comment
+    
+    # a
+    # a1
+    print()
+    # a2
+    print()
+    # b
+    
+    # b2
+    print(
+        c # e
+    )
+    # c
+    print(d)
+    # final comment
+"""
+    )
+
+    expected_src = (
+        """\
+def foo():
+    # indented but not connected comment
+    
+    # a
+    # a1
+    print()
+    # a2
+    print()
+    # b
+    
+    # b2
+    print(
+        c # e
+    )
+    # c
+"""
+    )
+
+    tree = ast.parse(source)
+
+    # # Remove the print(d)
+    tree.body[0].body.pop()
+
+    base = PreciseUnparser(source=source, empty_lines=True)
     assert base.unparse(tree) + "\n" == expected_src

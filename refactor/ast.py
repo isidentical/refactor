@@ -139,6 +139,7 @@ class PreciseUnparser(BaseUnparser):
     for major statements and child node recovery."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        self.empty_lines = kwargs.pop("empty_lines", None)
         self._visited_comment_lines: set[int] = set()
         super().__init__(*args, **kwargs)
 
@@ -222,10 +223,12 @@ class PreciseUnparser(BaseUnparser):
         preceding_comments = []
         for offset, line in enumerate(reversed(lines[:node_start])):
             comment_begin = line.find("#")
-            if comment_begin == -1 or comment_begin != node.col_offset:
+            not_valid_comment: bool = comment_begin == -1 or comment_begin != node.col_offset
+            no_empty_lines: bool = not self.empty_lines or line and not line.isspace()
+            if no_empty_lines and not_valid_comment:
                 break
 
-            preceding_comments.append((node_start - offset, line, comment_begin))
+            preceding_comments.append((node_start - offset, line, node.col_offset))
 
         for comment_info in reversed(preceding_comments):
             _write_if_unseen_comment(*comment_info)
@@ -240,7 +243,7 @@ class PreciseUnparser(BaseUnparser):
             _write_if_unseen_comment(
                 line_no=node_end + offset,
                 line=line,
-                comment_begin=comment_begin,
+                comment_begin=node.col_offset,
             )
 
     def collect_comments(self, node: ast.AST) -> ContextManager[None]:
