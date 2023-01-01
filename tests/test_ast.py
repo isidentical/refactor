@@ -341,9 +341,9 @@ def test_apply_source_formatting_maintains_with_await_1():
     source = """def func():
     if something:
         # Comments are retrieved
-        print(call(.1),
+        print(call(.1), # Comments are retrieved. separation can be updated to x spaces (1 default)
               maybe+something_else_that_is_very_very_very_long,
-              maybe / other,
+              maybe / other,# Comments are retrieved. separation can be updated to x spaces (1 default)
               thing   . a
         )
 """
@@ -351,9 +351,9 @@ def test_apply_source_formatting_maintains_with_await_1():
     expected_src = """def func():
     if something:
         # Comments are retrieved
-        await print(call(.1),
+        await print(call(.1), # Comments are retrieved. separation can be updated to x spaces (1 default)
               maybe+something_else_that_is_very_very_very_long,
-              maybe / other,
+              maybe / other, # Comments are retrieved. separation can be updated to x spaces (1 default)
               thing   . a
         )
 """
@@ -423,21 +423,21 @@ def test_apply_source_formatting_maintains_with_call_on_closing_parens():
     source = """def func():
     if something:
         # Comments are retrieved
-        print(call(.1), # This comment is unchanged
+        print(call(.1), # Comments are retrieved, spacing of x spaces (1 default)
               maybe+something_else_that_is_very_very_very_long,
-              maybe / other, # This comment is unchanged
+              maybe / other,     # Comments are retrieved, spacing of x spaces (1 default)
               thing   . a
-          ) # This is mis-aligned and spacing of comment doesn't change on last line
+          ) # Non-standard indent is conserved and comments, spacing of x spaces (1 default)
 """
 
     expected_src = """def func():
     if something:
         # Comments are retrieved
-        call_instead(print(call(.1), # This comment is unchanged
+        call_instead(print(call(.1), # Comments are retrieved, spacing of x spaces (1 default)
               maybe+something_else_that_is_very_very_very_long,
-              maybe / other, # This comment is unchanged
+              maybe / other, # Comments are retrieved, spacing of x spaces (1 default)
               thing   . a
-          )) # This is mis-aligned and spacing of comment doesn't change on last line
+          )) # Non-standard indent is conserved and comments, spacing of x spaces (1 default)
 """
     source_tree = ast.parse(source)
     context = Context(source, source_tree)
@@ -508,17 +508,17 @@ def test_apply_source_formatting_maintains_with_async():
     source = """def func():
     if something:
         # Comments are retrieved
-        with something: # comment2 becomes spacing of 2
-             a = 1 # Non-standard indent
-             b = 2 # Non-standard indent, comment is unchanged due to 'end_suffix'
+        with something: # comment2, spacing of x spaces (1 default)
+             a = 1 # Non-standard indent is conserved, spacing of x spaces (1 default)
+             b = 2 # Non-standard indent is conserved, spacing of x spaces (1 default)
 """
 
     expected_src = """def func():
     if something:
         # Comments are retrieved
-        async with something:  # comment2 becomes spacing of 2
-            a = 1  # Non-standard indent
-            b = 2 # Non-standard indent, comment is unchanged due to 'end_suffix'
+        async with something: # comment2, spacing of x spaces (1 default)
+             a = 1 # Non-standard indent is conserved, spacing of x spaces (1 default)
+             b = 2 # Non-standard indent is conserved, spacing of x spaces (1 default)
 """
     source_tree = ast.parse(source)
     context = Context(source, source_tree)

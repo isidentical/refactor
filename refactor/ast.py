@@ -14,7 +14,7 @@ from functools import cached_property
 from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, Tuple
 
 from refactor import common
-from refactor.common import find_indent, extract_str_difference
+from refactor.common import find_indent, extract_str_difference, find_indent_comments
 
 DEFAULT_ENCODING = "utf-8"
 
@@ -29,60 +29,82 @@ class Lines(UserList[StringType]):
     def __post_init__(self) -> None:
         super().__init__(self.lines)
         self.lines = self.data
+        self.best_matches: list[StringType] = []
 
     def join(self) -> str:
         """Return the combined source code."""
         return "".join(map(str, self.lines))
+
+    @staticmethod
+    def find_best_matching_source_line(line: str, source_lines: Lines, percentile: float = 10) -> Tuple[str | None, str, str]:
+        """Finds the best matching line in a list of lines
+        Returns the source line indentation and comments"""
+        _line: str | None = None
+        for _l in source_lines.lines:
+            _line: str = str(_l)
+            indentation, _, comments = find_indent_comments(_line)
+
+            # Estimate the changes between the two lines
+            changes = extract_str_difference(_line, line, without_comments=True)
+
+            # There should be minimal changes - how to estimate that threshold?
+            if changes['a']['percent'] < percentile:
+                if "#" in line:
+                    return _line, indentation, ""
+                return _line, indentation, comments
+        return None, "", ""
 
     def apply_source_formatting(
         self,
         source_lines: Lines,
         *,
         markers: Tuple[int, int, int | None] = None,
+        comments_separator: str = " "
     ) -> None:
         """Apply the indentation from source_lines when the first several characters match
 
         :param source_lines: Original lines in source code
         :param markers: Indentation and prefix parameters. Tuple of (start line, col_offset, end_suffix | None)
+        :param comments_separator: Separator for comments
         """
 
-        indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
+        block_indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
         end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
 
-        original_line: str | None
         for index, line in enumerate(self.data):
-            comments: str = ""
-            p_common = 0
-            if index < len(source_lines):
-                original_line = str(source_lines[index])
-                difference, p_common = extract_str_difference(original_line, line, with_comments=True)
-                print(difference)
-                if "#" in difference:
-                    m = re.search(r"(#.+)\n", original_line)
-                    comments = "  " + m.group(1) if m and m.group(1) != "" else ""
-                    difference, p_common = extract_str_difference(original_line, line)
-            else:
-                original_line = None
+            print(f">{line}<>{end_suffix}<")
+            # Let's see if we find a matching original line using statistical change to original lines (default < 10%)
+            original_line, indentation, comments = self.find_best_matching_source_line(line, source_lines[markers[0]:])
 
-            line_w_comments: str = line[:-1] + comments + line[-1] if len(line) > 0 and line[-1] == "\n" else line + comments
-            line_w_comments = line_w_comments if p_common < 0.25 else line
+            if original_line is not None:
+                # Remove the line indentation, collect comments
+                _, line, new_comments = find_indent_comments(line)
+
+                # Update for comments either on the 'line' or on the original line
+                if new_comments and not new_comments.isspace():
+                    # 'line' include comments, keep and implement 2 spaces separation
+                    line = line + comments_separator + new_comments
+
+                elif comments and not comments.isspace():
+                    # Comments from original line may have end-of-line, using the 'line' terminator
+                    comments = re.sub(self._newline_type, '', comments)
+                    # If line has a return, insert the comments just before it
+                    # Use 2 space separator as recommended by PyCharm (from PEP?)
+                    if line and line[-1] == self._newline_type:
+                        line = line[:-1] + comments_separator + comments + line[-1]
+                    else:
+                        line = line + comments_separator + comments
+
+            self.data[index] = indentation + str(line)
 
             if index == 0:
-                self.data[index] = indentation + str(start_prefix) + str(line_w_comments)  # type: ignore
-            elif index == len(self.data) - 1:
-                if original_line is not None and original_line.startswith(line[:-1]):
-                    self.data[index] = line  # type: ignore
-                else:
-                    self.data[index] = indentation + line  # type: ignore
+                self.data[index] = block_indentation + str(start_prefix) + str(line)
 
-            # The updated line can have an extra wrapping in brackets
-            elif original_line is not None and original_line.startswith(line[:-1]):
-                self.data[index] = line_w_comments  # type: ignore
-            else:
-                self.data[index] = indentation + line_w_comments  # type: ignore
-
-        if len(self.data) >= 1:
-            self.data[-1] += str(end_suffix)  # type: ignore
+            if index == len(self.data) - 1:
+                if original_line is None:
+                    self.data[index] = self.data[index] + str(end_suffix)
+                elif original_line[-1] == self._newline_type:
+                    self.data[index] = self.data[index] + self._newline_type
 
     @cached_property
     def _newline_type(self) -> str:
