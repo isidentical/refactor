@@ -4,6 +4,7 @@ import ast
 import warnings
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
+from pprint import pprint
 from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
@@ -177,7 +178,8 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
 
         original_node_end = cast(int, self.node.end_lineno) - 1
         if lines[original_node_end].endswith(lines._newline_type):
-            replacement[-1] += lines._newline_type
+            pprint(replacement)
+            replacement[-1] += lines._newline_type if not replacement[-1].endswith(lines._newline_type) else ""
         else:
             # If the original anchor's last line doesn't end with a newline,
             # then we need to also prevent our new source from ending with

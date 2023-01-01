@@ -237,7 +237,9 @@ def split_python_wise(x: str, seps: List[str] = " ()[]{}\"'"):
 
 def split_on_separators(string: str, separators: List[str] = "()[]{}'" + '"') -> List[str]:
     pattern = "|".join([f"{re.escape(sep)}(?!{re.escape(sep)})" for sep in separators] + [" "])
-    return [s + s if s in separators else s for s in re.split(pattern, string)]
+    result = [s + s if s in separators else s for s in re.split(pattern, string)]
+    separators_found = [s for s in separators if s in string]
+    return result + separators_found
 
 
 def extract_str_difference(a: str,
@@ -251,8 +253,8 @@ def extract_str_difference(a: str,
     b = re.match(r'^([^#]*)', b).group(1) if without_comments else b
 
     # Remove leading white spaces if requested
-    a = re.match(r'^\s*?([\S].*)$', a).group(1) if ignore_leading_spaces else a
-    b = re.match(r'^\s*?([\S].*)$', b).group(1) if ignore_leading_spaces else b
+    a = m.group(1) if ignore_leading_spaces and (m := re.match(r'^\s*?([\S\n].*)', a)) else a
+    b = m.group(1) if ignore_leading_spaces and (m := re.match(r'^\s*?([\S\n].*)', b)) else b
 
     differences: Dict[str, Dict[str, str | float | Set[str]]] = {
         "a": {"changes": set(), "percent": 0.0},
@@ -267,8 +269,8 @@ def extract_str_difference(a: str,
             differences['b']['changes'].add(item)
             differences['b']['percent'] = differences['b']['percent'] + len(item)
 
-    differences['a']['percent'] = differences['a']['percent'] / len(a.split()) * 100
-    differences['b']['percent'] = differences['b']['percent'] / len(b.split()) * 100
+    differences['a']['percent'] = differences['a']['percent'] / (len(a.split()) + 1) * 100
+    differences['b']['percent'] = differences['b']['percent'] / (len(b.split()) + 1) * 100
     return differences
 
 

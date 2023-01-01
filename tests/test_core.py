@@ -50,14 +50,14 @@ def test_apply_simple(source, expected, target_func, replacement):
     [
         (
             """
-                import x # comments
+                import x # comments will be copied since identical python statement
                 print(x.y) # comments here
                 def something(x, y):
                     return x + y # comments
             """,
             """
-                import x # comments
-                import x
+                import x # comments will be copied since identical python statement
+                import x # comments will be copied since identical python statement
                 print(x.y) # comments here
                 def something(x, y):
                     return x + y # comments
