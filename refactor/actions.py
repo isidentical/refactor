@@ -91,11 +91,11 @@ class _ReplaceCodeSegmentAction(BaseAction):
         view = slice(lineno - 1, end_lineno)
         source_lines = lines[view]
 
-        indentation, start_prefix = find_indent(source_lines[0][:col_offset])
-        end_suffix = source_lines[-1][end_col_offset:]
         replacement = split_lines(self._resynthesize(context))
-        replacement.apply_indentation(
-            indentation, start_prefix=start_prefix, end_suffix=end_suffix
+        # Applies the block indentation only if the replacement lines are different from source
+        replacement.apply_source_formatting(
+            source_lines=source_lines,
+            markers=(0, col_offset, end_col_offset),
         )
 
         lines[view] = replacement
@@ -170,12 +170,12 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source, encoding=context.file_info.get_encoding())
-        indentation, start_prefix = find_indent(
-            lines[self.node.lineno - 1][: self.node.col_offset]
-        )
 
         replacement = split_lines(context.unparse(self.build()))
-        replacement.apply_indentation(indentation, start_prefix=start_prefix)
+        replacement.apply_source_formatting(
+            source_lines=lines,
+            markers=(self.node.lineno - 1, self.node.col_offset, None),
+        )
 
         original_node_end = cast(int, self.node.end_lineno) - 1
         if lines[original_node_end].endswith(lines._newline_type):

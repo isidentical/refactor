@@ -6,8 +6,9 @@ import tokenize
 
 import pytest
 
-from refactor import common
+from refactor import common, Context
 from refactor.ast import BaseUnparser, PreciseUnparser, split_lines
+from refactor.common import position_for, clone
 
 
 def test_split_lines():
@@ -169,6 +170,7 @@ def test_precise_unparser_indented_literals():
         """\
     def func():
         if something:
+            # On change, comments are removed
             print(
                 "bleh"
                 "zoom"
@@ -240,3 +242,374 @@ def test_precise_unparser_comments():
 
     base = PreciseUnparser(source=source)
     assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_unparser_custom_indent_no_changes():
+    source = """def func():
+    if something:
+        # Arguments have custom indentation
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        # Arguments have custom indentation
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    tree = ast.parse(source)
+
+    base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_precise_unparser_custom_indent_del():
+    source = """def func():
+    if something:
+        # Arguments have custom indentation
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        print(call(.1), maybe+something_else_that_is_very_very_very_long, thing   . a)
+"""
+
+    tree = ast.parse(source)
+    del tree.body[0].body[0].body[0].value.args[2]
+
+    base = PreciseUnparser(source=source)
+    assert base.unparse(tree) + "\n" == expected_src
+
+
+def test_apply_source_formatting_maintains_with_await_0():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        print(
+              call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        await print(
+              call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0].value
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Await(node_to_replace)
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_await_1():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        await print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0].value
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Await(node_to_replace)
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_call():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        call_instead(print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        ))
+"""
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0].value
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Call(func=ast.Name(id="call_instead"), args=[node_to_replace], keywords=[])
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_call_on_closing_parens():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+          ) # This is mis-aligned
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        call_instead(print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+          )) # This is mis-aligned
+"""
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0].value
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Call(func=ast.Name(id="call_instead"), args=[node_to_replace], keywords=[])
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_async_complex():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        with print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        ) as p:
+            do_something()
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        async with print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        ) as p:
+            do_something()
+"""
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0]
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = clone(node_to_replace)
+    new_node.__class__ = ast.AsyncWith
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_async():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        with something: # comment2
+             a = 1 # Non-standard indent
+             b = 2 # Non-standard indent becomes standard
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        async with something:
+            a = 1
+            b = 2 # Non-standard indent becomes standard
+"""
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0]
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = clone(node_to_replace)
+    new_node.__class__ = ast.AsyncWith
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_maintains_with_fstring():
+    source = '''def f():
+    return """
+a
+"""
+'''
+
+    expected_src = '''def f():
+    return F("""
+a
+""")
+'''
+
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].value
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    new_node = ast.Call(func=ast.Name(id="F"), args=[node_to_replace], keywords=[])
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src
+
+
+def test_apply_source_formatting_does_not_with_change():
+    source = """def func():
+    if something:
+        # Comments are retrieved
+        print(call(.1),
+              maybe+something_else_that_is_very_very_very_long,
+              maybe / other,
+              thing   . a
+        )
+"""
+
+    expected_src = """def func():
+    if something:
+        # Comments are retrieved
+        await print(call(.1), maybe+something_else_that_is_very_very_very_long, thing   . a)
+"""
+
+    source_tree = ast.parse(source)
+    context = Context(source, source_tree)
+
+    node_to_replace = source_tree.body[0].body[0].body[0].value
+
+    (lineno, col_offset, end_lineno, end_col_offset) = position_for(node_to_replace)
+    view = slice(lineno - 1, end_lineno)
+
+    lines = split_lines(source)
+    source_lines = lines[view]
+
+    del node_to_replace.args[2]
+    new_node = ast.Await(node_to_replace)
+    replacement = split_lines(context.unparse(new_node))
+    replacement.apply_source_formatting(
+        source_lines=source_lines,
+        markers=(0, col_offset, end_col_offset),
+    )
+    lines[view] = replacement
+    assert lines.join() == expected_src

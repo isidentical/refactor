@@ -371,6 +371,37 @@ class MakeFunctionAsync(Rule):
         return AsyncifierAction(node)
 
 
+class AwaitifierAction(LazyReplace):
+    def build(self):
+        if isinstance(self.node, ast.Expr):
+            self.node.value = ast.Await(self.node.value)
+            return self.node
+        if isinstance(self.node, ast.Call):
+            new_node = ast.Await(self.node)
+            return new_node
+
+
+class MakeCallAwait(Rule):
+    INPUT_SOURCE = """
+    def somefunc():
+        call(
+            arg0,
+             arg1) # Intentional mis-alignment
+    """
+
+    EXPECTED_SOURCE = """
+    def somefunc():
+        await call(
+            arg0,
+             arg1) # Intentional mis-alignment
+    """
+
+    def match(self, node):
+        assert isinstance(node, ast.Expr)
+        assert isinstance(node.value, ast.Call)
+        return AwaitifierAction(node)
+
+
 class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
     context_providers = (context.Scope,)
 
@@ -1016,6 +1047,31 @@ class AtomicTryBlock(Rule):
             yield InsertAfter(node, remaining_try)
 
 
+class WrapInMultilineFstring(Rule):
+    INPUT_SOURCE = '''
+def f():
+    return """
+a
+"""
+'''
+    EXPECTED_SOURCE = '''
+def f():
+    return F("""
+a
+""")
+'''
+
+    def match(self, node):
+        assert isinstance(node, ast.Constant)
+
+        # Prevent wrapping F-strings that are already wrapped in F()
+        # Otherwise you get infinite F(F(F(F(...))))
+        parent = self.context.ancestry.get_parent(node)
+        assert not (isinstance(parent, ast.Call) and isinstance(parent.func, ast.Name) and parent.func.id == 'F')
+
+        return Replace(node, ast.Call(func=ast.Name(id="F"), args=[node], keywords=[]))
+
+
 @pytest.mark.parametrize(
     "rule",
     [
@@ -1025,6 +1081,7 @@ class AtomicTryBlock(Rule):
         TypingAutoImporter,
         TypingAutoImporterBefore,
         MakeFunctionAsync,
+        MakeCallAwait,
         OnlyKeywordArgumentDefaultNotSetCheckRule,
         InternalizeFunctions,
         RemoveDeadCode,
@@ -1033,6 +1090,7 @@ class AtomicTryBlock(Rule):
         PropagateAndDelete,
         FoldMyConstants,
         AtomicTryBlock,
+        WrapInMultilineFstring,
     ],
 )
 def test_complete_rules(rule, tmp_path):

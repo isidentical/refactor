@@ -10,9 +10,10 @@ from collections.abc import Generator, Iterator
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast
+from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, Tuple
 
 from refactor import common
+from refactor.common import find_indent
 
 DEFAULT_ENCODING = "utf-8"
 
@@ -32,19 +33,33 @@ class Lines(UserList[StringType]):
         """Return the combined source code."""
         return "".join(map(str, self.lines))
 
-    def apply_indentation(
+    def apply_source_formatting(
         self,
-        indentation: StringType,
+        source_lines: Lines,
         *,
-        start_prefix: AnyStringType = "",
-        end_suffix: AnyStringType = "",
+        markers: Tuple[int, int, int | None] = None,
     ) -> None:
-        """Apply the given indentation, optionally with start and end prefixes
-        to the bound source lines."""
+        """Apply the indentation from source_lines when the first several characters match
 
+        :param source_lines: Original lines in source code
+        :param markers: Indentation and prefix parameters. Tuple of (start line, col_offset, end_suffix | None)
+        """
+
+        indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
+        end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
+
+        original_line: str | None
         for index, line in enumerate(self.data):
+            if index < len(source_lines):
+                original_line = source_lines[index]
+            else:
+                original_line = None
+
             if index == 0:
                 self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
+            # The updated line can have an extra wrapping in brackets
+            elif original_line is not None and original_line.startswith(line[:-1]):
+                self.data[index] = line  # type: ignore
             else:
                 self.data[index] = indentation + line  # type: ignore
 
@@ -77,7 +92,7 @@ class SourceSegment(UserString):
             # re-implements the direct indexing as slicing (e.g. a[1] is a[1:2], with
             # error handling).
             direct_index = operator.index(index)
-            view = raw_line[direct_index : direct_index + 1].decode(
+            view = raw_line[direct_index: direct_index + 1].decode(
                 encoding=self.encoding
             )
             if not view:
