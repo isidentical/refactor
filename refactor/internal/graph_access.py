@@ -135,14 +135,14 @@ class GraphPath:
             assert isinstance(target_access, IndexAccess)
 
             # This change might affect the future nodes in this path
-            # but not us.
-            if shifter.index >= target_access.index:
+            # When the requested shift_offset is negative, it does affect us
+            # by the amount of offset
+            if shifter.index + shift_offset >= target_access.index:
                 continue
 
             parts[parts.index(target_access)] = target_access.replace(
-                index=target_access.index + shift_offset
+                index=target_access.index + abs(shift_offset)
             )
-
         return GraphPath(parts)
 
     def execute(self, node: ast.AST) -> ast.AST:

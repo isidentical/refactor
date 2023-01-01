@@ -18,7 +18,9 @@ C = TypeVar("C")
 __all__ = [
     "BaseAction",
     "InsertAfter",
+    "InsertBefore",
     "LazyInsertAfter",
+    "LazyInsertBefore",
     "LazyReplace",
     "Replace",
     "Erase",
@@ -198,7 +200,47 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
 
 
 @dataclass
+class LazyInsertBefore(_LazyActionMixin[ast.stmt, ast.stmt]):
+    """Inserts the re-synthesized version :py:meth:`LazyInsertBefore.build`'s
+    output right before the given `node`.
+
+    .. note::
+        Subclasses of :py:class:`LazyInsertBefore` must override
+        :py:meth:`LazyInsertBefore.build`.
+
+    .. note::
+        This action requires both the `node` and the built target to be statements.
+    """
+
+    def apply(self, context: Context, source: str) -> str:
+        lines = split_lines(source, encoding=context.file_info.get_encoding())
+        indentation, start_prefix = find_indent(
+            lines[self.node.lineno - 1][: self.node.col_offset]
+        )
+
+        replacement = split_lines(context.unparse(self.build()))
+        replacement.apply_indentation(indentation, start_prefix=start_prefix)
+        replacement[-1] += lines._newline_type
+
+        original_node_start = cast(int, self.node.lineno)
+        for line in reversed(replacement):
+            lines.insert(original_node_start - 1, line)
+
+        return lines.join()
+
+    def _stack_effect(self) -> tuple[ast.AST, int]:
+        # Adding a statement right before the node will need to be reflected
+        # in the block.
+        return (self.node, -1)
+
+
+@dataclass
 class NewStatementAction(LazyInsertAfter, _DeprecatedAliasMixin):
+    ...
+
+
+@dataclass
+class NewStatementBeforeAction(LazyInsertBefore, _DeprecatedAliasMixin):
     ...
 
 
@@ -219,7 +261,27 @@ class InsertAfter(LazyInsertAfter):
 
 
 @dataclass
+class InsertBefore(LazyInsertBefore):
+    """Inserts the re-synthesized version of given `target` right after
+    the given `node`.
+
+    .. note::
+        This action requires both the `node` and `target` to be a statements.
+    """
+
+    target: ast.stmt
+
+    def build(self) -> ast.stmt:
+        return self.target
+
+
+@dataclass
 class TargetedNewStatementAction(InsertAfter, _DeprecatedAliasMixin):
+    ...
+
+
+@dataclass
+class TargetedNewStatementBeforeAction(InsertBefore, _DeprecatedAliasMixin):
     ...
 
 
@@ -274,7 +336,7 @@ class Erase(_ReplaceCodeSegmentAction):
             return ""
 
     def _stack_effect(self) -> tuple[ast.AST, int]:
-        # Erasing a single node mean positions of all the followinng statements will
+        # Erasing a single node mean positions of all the following statements will
         # need to reduced by 1.
         return (self.node, -1)
 
