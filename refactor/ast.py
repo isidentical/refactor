@@ -72,8 +72,17 @@ class Lines(UserList[StringType]):
         :param comments_separator: Separator for comments
         """
 
+        def reconstruct_comments(line_to_update, new, original) -> str:
+            if new and not new.isspace():
+                return line_to_update + comments_separator + new
+            if original and not original.isspace():
+                original = re.sub(self._newline_type, '', original)
+                if line_to_update and line_to_update[-1] == self._newline_type:
+                    return line_to_update[:-1] + comments_separator + original + line_to_update[-1]
+                return line_to_update + comments_separator + original
+            return line_to_update
+
         block_indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
-        end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
 
         for index, line in enumerate(self.data):
             # Let's see if we find a matching original line using statistical change to original lines (default < 10%)
@@ -81,34 +90,26 @@ class Lines(UserList[StringType]):
              indentation,
              comments) = self.find_best_matching_source_line(line, source_lines[markers[0]:])
 
-            if original_line is not None:
+            if original_line is None:
+                # If there is no good match as original line, implement the block_separator
+                self.data[index] = block_indentation + str(line)
+            else:
                 # Remove the line indentation, collect comments
                 _, line, new_comments = find_indent_comments(line)
-
-                # Update for comments either on the 'line' or on the original line
-                if new_comments and not new_comments.isspace():
-                    # 'line' include comments, keep and implement 2 spaces separation
-                    line = line + comments_separator + new_comments
-
-                elif comments and not comments.isspace():
-                    # Comments from original line may have end-of-line, using the 'line' terminator
-                    comments = re.sub(self._newline_type, '', comments)
-                    # If line has a return, insert the comments just before it
-                    # Use 2 space separator as recommended by PyCharm (from PEP?)
-                    if line and line[-1] == self._newline_type:
-                        line = line[:-1] + comments_separator + comments + line[-1]
-                    else:
-                        line = line + comments_separator + comments
-
+                line: str = reconstruct_comments(line, new_comments, comments)
                 self.data[index] = indentation + str(line)
-            else:
-                self.data[index] = block_indentation + str(line)
 
+            # Edge cases: First line, override with the block indentation, keeping the comments
             if index == 0:
                 self.data[index] = block_indentation + str(start_prefix) + str(line)
 
+            # For the last line:
+            #    if no good match, append the end_suffix
+            #    otherwise, add the newline if present in the original
+            #       Note that this seems more appropriate here than in the actions.py
             if index == len(self.data) - 1:
                 if original_line is None:
+                    end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
                     self.data[index] = self.data[index] + str(end_suffix)
                 elif original_line[-1] == self._newline_type:
                     self.data[index] = self.data[index] + self._newline_type
