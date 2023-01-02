@@ -4,6 +4,7 @@ import ast
 import warnings
 from contextlib import suppress
 from dataclasses import dataclass, field, replace
+from pprint import pprint
 from typing import Generic, TypeVar, cast
 
 from refactor.ast import split_lines
@@ -91,11 +92,11 @@ class _ReplaceCodeSegmentAction(BaseAction):
         view = slice(lineno - 1, end_lineno)
         source_lines = lines[view]
 
-        indentation, start_prefix = find_indent(source_lines[0][:col_offset])
-        end_suffix = source_lines[-1][end_col_offset:]
         replacement = split_lines(self._resynthesize(context))
-        replacement.apply_indentation(
-            indentation, start_prefix=start_prefix, end_suffix=end_suffix
+        # Applies the block indentation only if the replacement lines are different from source
+        replacement.apply_source_formatting(
+            source_lines=source_lines,
+            markers=(0, col_offset, end_col_offset),
         )
 
         lines[view] = replacement
@@ -170,16 +171,16 @@ class LazyInsertAfter(_LazyActionMixin[ast.stmt, ast.stmt]):
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source, encoding=context.file_info.get_encoding())
-        indentation, start_prefix = find_indent(
-            lines[self.node.lineno - 1][: self.node.col_offset]
-        )
 
         replacement = split_lines(context.unparse(self.build()))
-        replacement.apply_indentation(indentation, start_prefix=start_prefix)
+        replacement.apply_source_formatting(
+            source_lines=lines,
+            markers=(self.node.lineno - 1, self.node.col_offset, None),
+        )
 
         original_node_end = cast(int, self.node.end_lineno) - 1
         if lines[original_node_end].endswith(lines._newline_type):
-            replacement[-1] += lines._newline_type
+            replacement[-1] += lines._newline_type if not replacement[-1].endswith(lines._newline_type) else ""
         else:
             # If the original anchor's last line doesn't end with a newline,
             # then we need to also prevent our new source from ending with
@@ -212,13 +213,13 @@ class LazyInsertBefore(_LazyActionMixin[ast.stmt, ast.stmt]):
 
     def apply(self, context: Context, source: str) -> str:
         lines = split_lines(source, encoding=context.file_info.get_encoding())
-        indentation, start_prefix = find_indent(
-            lines[self.node.lineno - 1][: self.node.col_offset]
-        )
 
         replacement = split_lines(context.unparse(self.build()))
-        replacement.apply_indentation(indentation, start_prefix=start_prefix)
-        replacement[-1] += lines._newline_type
+        replacement.apply_source_formatting(
+            source_lines=lines,
+            markers=(self.node.lineno - 1, self.node.col_offset, None),
+        )
+        replacement[-1] += lines._newline_type if not replacement[-1].endswith(lines._newline_type) else ""
 
         original_node_start = cast(int, self.node.lineno)
         for line in reversed(replacement):

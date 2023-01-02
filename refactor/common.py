@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import ast
 import copy
+import difflib
+import re
 from collections import deque
 from collections.abc import Iterable, Iterator
 from dataclasses import dataclass
 from functools import cache, singledispatch, wraps
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Callable, TypeVar, cast, Set, List, Tuple, Dict, AnyStr
 
 if TYPE_CHECKING:
     from refactor.context import Context
@@ -76,7 +78,7 @@ def is_truthy(op: ast.cmpop) -> bool | None:
 
 
 def _type_checker(
-    *types: type, binders: Iterable[Callable[[type], bool]] = ()
+        *types: type, binders: Iterable[Callable[[type], bool]] = ()
 ) -> Callable[[Any], bool]:
     binders = [getattr(binder, "fast_checker", binder) for binder in binders]
 
@@ -134,7 +136,7 @@ def _get_known_location_from_source(source: str, location: PositionType) -> str 
     if start_line == end_line:
         return lines[start_line][start_col:end_col]
 
-    start, *middle, end = lines[start_line : end_line + 1]
+    start, *middle, end = lines[start_line: end_line + 1]
     new_lines = (start[start_col:], *middle, end[:end_col])
     return "\n".join(new_lines)
 
@@ -176,6 +178,31 @@ def find_indent(source: str) -> tuple[str, str]:
     return source[:index], source[index:]
 
 
+def find_comments(source: str) -> tuple[str, str]:
+    """Split the given line into the current indentation
+    and the remaining characters."""
+    index = 0
+    for index, char in enumerate(source, 1):
+        if char == "#":
+            break
+    return source[:index], source[index:]
+
+
+def find_indent_comments(source: str) -> tuple[str, str, str]:
+    """Split the given line into the current indentation
+    and the remaining characters."""
+    indent, comment = -1, -1
+    for index, char in enumerate(source, 1):
+        if not char.isspace() and indent == -1:
+            indent = index - 1
+        if char == "#":
+            comment = index - 1
+            break
+    if comment != -1:
+        return source[:indent], source[indent:comment].strip(), source[comment:]
+    return source[:indent], source[indent:], ""
+
+
 def find_closest(node: ast.AST, *targets: ast.AST) -> ast.AST:
     """Find the closest node to the given ``node`` from the given
     sequence of ``targets`` (uses absolute distance from starting points)."""
@@ -199,6 +226,106 @@ def extract_from_text(text: str) -> ast.AST:
     """Extract the first AST node from the given ``text``'s
     parsed AST."""
     return ast.parse(text).body[0]
+
+
+def split_python_wise(x: str, seps: List[str] = " ()[]{}\"'"):
+    default_sep = seps[0]
+    for s in seps[1:]:
+        x = x.replace(s, default_sep + s + default_sep)
+    return [i.strip() for i in x.split(default_sep)]
+
+
+def split_on_separators(string: str, separators: List[str] = "()[]{}'" + '"') -> List[str]:
+    pattern = "|".join([f"{re.escape(sep)}(?!{re.escape(sep)})" for sep in separators] + [" "])
+    result = [s + s if s in separators else s for s in re.split(pattern, string)]
+    separators_found = [s for s in separators if s in string]
+    return result + separators_found
+
+
+def extract_str_difference(a: str,
+                           b: str,
+                           without_comments: bool = True,
+                           ignore_leading_spaces: bool = True
+                           ) -> Dict[str, Dict[str, str | float | Set[str]]]:
+    """Returns a set of "words" that are different between 2 strings"""
+    # Remove comments if requested
+    a = re.match(r'^([^#]*)', a).group(1) if without_comments else a
+    b = re.match(r'^([^#]*)', b).group(1) if without_comments else b
+
+    # Remove leading white spaces if requested
+    a = m.group(1) if ignore_leading_spaces and (m := re.match(r'^\s*?([\S\n].*)', a)) else a
+    b = m.group(1) if ignore_leading_spaces and (m := re.match(r'^\s*?([\S\n].*)', b)) else b
+
+    differences: Dict[str, Dict[str, str | float | Set[str]]] = {
+        "a": {"changes": set(), "percent": 0.0},
+        "b": {"changes": set(), "percent": 0.0}}
+
+    raw_diff: Set[str] = set(split_on_separators(a)).symmetric_difference(set(split_on_separators(b)))
+    for item in raw_diff:
+        if item in a and item not in b:
+            differences['a']['changes'].add(item)
+            differences['a']['percent'] = differences['a']['percent'] + len(item)
+        else:
+            differences['b']['changes'].add(item)
+            differences['b']['percent'] = differences['b']['percent'] + len(item)
+
+    differences['a']['percent'] = differences['a']['percent'] / (len(a.split()) + 1) * 100
+    differences['b']['percent'] = differences['b']['percent'] / (len(b.split()) + 1) * 100
+    return differences
+
+
+def extract_string_differences(a: str,
+                               b: str,
+                               without_comments: bool = True,
+                               ignore_leading_spaces: bool = True,
+                               ignore_spaces: bool = False) -> Dict[str, Dict[str, str | float]]:
+    """Calculate the difference between two strings. Optionally removes that comments.
+
+    :param str a: The first string to compare.
+    :param str b: The second string to compare.
+    :param bool with_comments: Optional removal of comments from the extraction.
+    :param bool ignore_spaces: Optional inclusion of space counting.
+    :returns: The differences and percentiles between the two strings in a dictionary.
+    :rtype: Dict
+    """
+    # Remove comments if requested
+    a = re.match(r'^([^#]*)', a).group(1) if without_comments else a
+    b = re.match(r'^([^#]*)', b).group(1) if without_comments else b
+
+    # Remove leading white spaces if requested
+    a = re.match(r'^\s*?([\S].*)$', a).group(1) if ignore_leading_spaces else a
+    b = re.match(r'^\s*?([\S].*)$', b).group(1) if ignore_leading_spaces else b
+
+    # Remove white spaces if requested
+    a = "".join(a.split() if ignore_spaces else list(a))
+    b = "".join(b.split() if ignore_spaces else list(b))
+
+    # Initialize the SequenceMatcher
+    matcher = difflib.SequenceMatcher(a=a, b=b)
+
+    # Store the differences between the two strings
+    differences = {
+        "a": {"changes": "", "percent": 0.0},
+        "b": {"changes": "", "percent": 0.0},
+        "common": {"changes": "", "percent": 0.0},
+    }
+
+    # Iterate over the opcodes and update the difference counter
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag == "replace":
+            differences["a"]["changes"] += a[i1:i2]
+            differences["b"]["changes"] += b[j1:j2]
+        elif tag == "delete":
+            differences["a"]["changes"] += a[i1:i2]
+        elif tag == "insert":
+            differences["b"]["changes"] += b[j1:j2]
+        elif tag == "equal":
+            differences["common"]["changes"] += a[i1:i2]
+
+        for key, value in differences.items():
+            value["percent"] = len(value["changes"]) / len(a) * 100
+
+    return differences
 
 
 _POSITIONAL_ATTRIBUTES = (

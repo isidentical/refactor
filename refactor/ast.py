@@ -4,15 +4,18 @@ import ast
 import io
 import operator
 import os
+import re
 import tokenize
 from collections import UserList, UserString
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager, nullcontext
 from dataclasses import dataclass
 from functools import cached_property
-from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast
+from pprint import pprint
+from typing import Any, ContextManager, Protocol, SupportsIndex, TypeVar, Union, cast, Tuple, Set, Dict, List, Callable
 
 from refactor import common
+from refactor.common import find_indent, extract_str_difference, find_indent_comments
 
 DEFAULT_ENCODING = "utf-8"
 
@@ -27,29 +30,89 @@ class Lines(UserList[StringType]):
     def __post_init__(self) -> None:
         super().__init__(self.lines)
         self.lines = self.data
+        self.best_matches: list[StringType] = []
 
     def join(self) -> str:
         """Return the combined source code."""
         return "".join(map(str, self.lines))
 
-    def apply_indentation(
-        self,
-        indentation: StringType,
-        *,
-        start_prefix: AnyStringType = "",
-        end_suffix: AnyStringType = "",
+    @staticmethod
+    def find_best_matching_source_line(line: str, source_lines: Lines, percentile: float = 10) -> Tuple[
+        str | None, str, str]:
+        """Finds the best matching line in a list of lines
+        Returns the source line indentation and comments"""
+        _line: str | None = None
+        changes: List[Dict[str, Tuple[str, str, str] | Dict[str, str | float | Set[str]]]] = []
+        for _l in source_lines.lines:
+            _line: str = str(_l)
+            # Estimate the changes between the two lines
+            changes.append(extract_str_difference(_line, line, without_comments=True))
+            indentation, _, comments = find_indent_comments(_line)
+            changes[-1]['output'] = _line, indentation, "" if "#" in line else comments
+
+        sort_key = lambda x: x['a']['percent'] + x['b']['percent']
+        sorted_changes = sorted(changes, key=sort_key)
+        for i, change in enumerate(sorted_changes):
+            # There should be minimal changes to the original line - how to estimate that threshold?
+            if change['a']['percent'] < percentile:
+                return change['output']
+        return None, "", ""
+
+    def apply_source_formatting(
+            self,
+            source_lines: Lines,
+            *,
+            markers: Tuple[int, int, int | None] = None,
+            comments_separator: str = " "
     ) -> None:
-        """Apply the given indentation, optionally with start and end prefixes
-        to the bound source lines."""
+        """Apply the indentation from source_lines when the first several characters match
+
+        :param source_lines: Original lines in source code
+        :param markers: Indentation and prefix parameters. Tuple of (start line, col_offset, end_suffix | None)
+        :param comments_separator: Separator for comments
+        """
+
+        def reconstruct_comments(line_to_update, new, original) -> str:
+            if new and not new.isspace():
+                return line_to_update + comments_separator + new
+            if original and not original.isspace():
+                original = re.sub(self._newline_type, '', original)
+                if line_to_update and line_to_update[-1] == self._newline_type:
+                    return line_to_update[:-1] + comments_separator + original + line_to_update[-1]
+                return line_to_update + comments_separator + original
+            return line_to_update
+
+        block_indentation, start_prefix = find_indent(source_lines[markers[0]][:markers[1]])
 
         for index, line in enumerate(self.data):
-            if index == 0:
-                self.data[index] = indentation + str(start_prefix) + str(line)  # type: ignore
-            else:
-                self.data[index] = indentation + line  # type: ignore
+            # Let's see if we find a matching original line using statistical change to original lines (default < 10%)
+            (original_line,
+             indentation,
+             comments) = self.find_best_matching_source_line(line, source_lines[markers[0]:])
 
-        if len(self.data) >= 1:
-            self.data[-1] += str(end_suffix)  # type: ignore
+            if original_line is None:
+                # If there is no good match as original line, implement the block_separator
+                self.data[index] = block_indentation + str(line)
+            else:
+                # Remove the line indentation, collect comments
+                _, line, new_comments = find_indent_comments(line)
+                line: str = reconstruct_comments(line, new_comments, comments)
+                self.data[index] = indentation + str(line)
+
+            # Edge cases: First line, override with the block indentation, keeping the comments
+            if index == 0:
+                self.data[index] = block_indentation + str(start_prefix) + str(line)
+
+            # For the last line:
+            #    if no good match, append the end_suffix
+            #    otherwise, add the newline if present in the original
+            #       Note that this seems more appropriate here than in the actions.py
+            if index == len(self.data) - 1:
+                if original_line is None:
+                    end_suffix = "" if markers[2] is None else source_lines[-1][markers[2]:]
+                    self.data[index] = self.data[index] + str(end_suffix)
+                elif original_line[-1] == self._newline_type:
+                    self.data[index] = self.data[index] + self._newline_type
 
     @cached_property
     def _newline_type(self) -> str:
@@ -77,7 +140,7 @@ class SourceSegment(UserString):
             # re-implements the direct indexing as slicing (e.g. a[1] is a[1:2], with
             # error handling).
             direct_index = operator.index(index)
-            view = raw_line[direct_index : direct_index + 1].decode(
+            view = raw_line[direct_index: direct_index + 1].decode(
                 encoding=self.encoding
             )
             if not view:
@@ -200,9 +263,9 @@ class PreciseUnparser(BaseUnparser):
     @contextmanager
     def _collect_stmt_comments(self, node: ast.AST) -> Iterator[None]:
         def _write_if_unseen_comment(
-            line_no: int,
-            line: str,
-            comment_begin: int,
+                line_no: int,
+                line: str,
+                comment_begin: int,
         ) -> None:
             if line_no in self._visited_comment_lines:
                 # We have already written this comment as the
