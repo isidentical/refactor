@@ -10,6 +10,7 @@ from refactor.ast import DEFAULT_ENCODING
 
 from refactor import Session, common
 from refactor.actions import Erase, InvalidActionError, InsertAfter, Replace, InsertBefore
+from refactor.common import clone
 from refactor.context import Context
 from refactor.core import Rule
 
@@ -48,60 +49,92 @@ with x as y:
 INVALID_ERASES_TREE = ast.parse(INVALID_ERASES)
 
 
-class TestInsertAfterBottom(Rule):
+class TestInsertBeforeDecoratedFunction(Rule):
     INPUT_SOURCE = """
-        try:
-            base_tree = get_tree(base_file, module_name)
-            first_tree = get_tree(first_tree, module_name)
-            second_tree = get_tree(second_tree, module_name)
-            third_tree = get_tree(third_tree, module_name)
-        except (SyntaxError, FileNotFoundError):
-            continue"""
+        @decorate
+        def decorated():
+            test_this()"""
 
     EXPECTED_SOURCE = """
-        try:
-            base_tree = get_tree(base_file, module_name)
-        except (SyntaxError, FileNotFoundError):
-            continue
+        await async_test()
+        @decorate
+        async def decorated():
+            test_this()"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertBefore]:
+        assert isinstance(node, ast.FunctionDef)
+
+        await_st = ast.parse("await async_test()")
+        yield InsertBefore(node, cast(ast.stmt, await_st))
+        new_node = clone(node)
+        new_node.__class__ = ast.AsyncFunctionDef
+        yield Replace(node, new_node)
+
+
+class TestInsertBeforeMultipleDecorators(Rule):
+    INPUT_SOURCE = """
+        @decorate0
+        @decorate1
+        @decorate2
+        def decorated():
+            test_this()"""
+
+    EXPECTED_SOURCE = """
+        await async_test()
+        @decorate0
+        @decorate1
+        @decorate2
+        async def decorated():
+            test_this()"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertBefore]:
+        assert isinstance(node, ast.FunctionDef)
+
+        await_st = ast.parse("await async_test()")
+        yield InsertBefore(node, cast(ast.stmt, await_st))
+        new_node = clone(node)
+        new_node.__class__ = ast.AsyncFunctionDef
+        yield Replace(node, new_node)
+
+
+class TestInsertAfterBottom(Rule):
+    INPUT_SOURCE = """
+        def undecorated():
+            test_this()"""
+
+    EXPECTED_SOURCE = """
+        async def undecorated():
+            test_this()
         await async_test()"""
 
     def match(self, node: ast.AST) -> Iterator[InsertAfter]:
-        assert isinstance(node, ast.Try)
-        assert len(node.body) >= 2
+        assert isinstance(node, ast.FunctionDef)
 
         await_st = ast.parse("await async_test()")
         yield InsertAfter(node, cast(ast.stmt, await_st))
-        new_try = common.clone(node)
-        new_try.body = [node.body[0]]
-        yield Replace(node, cast(ast.AST, new_try))
+        new_node = clone(node)
+        new_node.__class__ = ast.AsyncFunctionDef
+        yield Replace(node, new_node)
 
 
 class TestInsertBeforeTop(Rule):
     INPUT_SOURCE = """
-        try:
-            base_tree = get_tree(base_file, module_name)
-            first_tree = get_tree(first_tree, module_name)
-            second_tree = get_tree(second_tree, module_name)
-            third_tree = get_tree(third_tree, module_name)
-        except (SyntaxError, FileNotFoundError):
-            continue"""
+        def undecorated():
+            test_this()"""
 
     EXPECTED_SOURCE = """
         await async_test()
-        try:
-            base_tree = get_tree(base_file, module_name)
-        except (SyntaxError, FileNotFoundError):
-            continue"""
+        async def undecorated():
+            test_this()"""
 
     def match(self, node: ast.AST) -> Iterator[InsertBefore]:
-        assert isinstance(node, ast.Try)
-        assert len(node.body) >= 2
+        assert isinstance(node, ast.FunctionDef)
 
         await_st = ast.parse("await async_test()")
         yield InsertBefore(node, cast(ast.stmt, await_st))
-        new_try = common.clone(node)
-        new_try.body = [node.body[0]]
-        yield Replace(node, cast(ast.AST, new_try))
+        new_node = clone(node)
+        new_node.__class__ = ast.AsyncFunctionDef
+        yield Replace(node, new_node)
 
 
 class TestInsertAfter(Rule):
@@ -488,6 +521,8 @@ def test_erase_invalid(invalid_node):
 @pytest.mark.parametrize(
     "rule",
     [
+        TestInsertBeforeDecoratedFunction,
+        TestInsertBeforeMultipleDecorators,
         TestInsertAfterBottom,
         TestInsertBeforeTop,
         TestInsertAfter,

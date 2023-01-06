@@ -371,6 +371,48 @@ class MakeFunctionAsync(Rule):
         return AsyncifierAction(node)
 
 
+class MakeFunctionAsyncWithDecorators(Rule):
+    INPUT_SOURCE = """
+    @deco0
+    @deco1(arg0,
+           arg1)
+    def something():
+        a += .1
+        '''you know
+            this is custom
+                literal
+        '''
+        print(we,
+            preserve,
+                everything
+        )
+        return (
+            right + "?")
+    """
+
+    EXPECTED_SOURCE = """
+    @deco0
+    @deco1(arg0,
+           arg1)
+    async def something():
+        a += .1
+        '''you know
+            this is custom
+                literal
+        '''
+        print(we,
+            preserve,
+                everything
+        )
+        return (
+            right + "?")
+    """
+
+    def match(self, node):
+        assert isinstance(node, ast.FunctionDef)
+        return AsyncifierAction(node)
+
+
 class OnlyKeywordArgumentDefaultNotSetCheckRule(Rule):
     context_providers = (context.Scope,)
 
