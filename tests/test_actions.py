@@ -49,6 +49,54 @@ with x as y:
 INVALID_ERASES_TREE = ast.parse(INVALID_ERASES)
 
 
+class TestInsertBeforeDecoratedFunction(Rule):
+    INPUT_SOURCE = """
+        @decorate
+        def decorated():
+            test_this()"""
+
+    EXPECTED_SOURCE = """
+        await async_test()
+        @decorate
+        async def decorated():
+            test_this()"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertBefore]:
+        assert isinstance(node, ast.FunctionDef)
+
+        await_st = ast.parse("await async_test()")
+        yield InsertBefore(node, cast(ast.stmt, await_st))
+        new_node = clone(node)
+        new_node.__class__ = ast.AsyncFunctionDef
+        yield Replace(node, new_node)
+
+
+class TestInsertBeforeMultipleDecorators(Rule):
+    INPUT_SOURCE = """
+        @decorate0
+        @decorate1
+        @decorate2
+        def decorated():
+            test_this()"""
+
+    EXPECTED_SOURCE = """
+        await async_test()
+        @decorate0
+        @decorate1
+        @decorate2
+        async def decorated():
+            test_this()"""
+
+    def match(self, node: ast.AST) -> Iterator[InsertBefore]:
+        assert isinstance(node, ast.FunctionDef)
+
+        await_st = ast.parse("await async_test()")
+        yield InsertBefore(node, cast(ast.stmt, await_st))
+        new_node = clone(node)
+        new_node.__class__ = ast.AsyncFunctionDef
+        yield Replace(node, new_node)
+
+
 class TestInsertAfterBottom(Rule):
     INPUT_SOURCE = """
         def undecorated():
@@ -77,28 +125,6 @@ class TestInsertBeforeTop(Rule):
     EXPECTED_SOURCE = """
         await async_test()
         async def undecorated():
-            test_this()"""
-
-    def match(self, node: ast.AST) -> Iterator[InsertBefore]:
-        assert isinstance(node, ast.FunctionDef)
-
-        await_st = ast.parse("await async_test()")
-        yield InsertBefore(node, cast(ast.stmt, await_st))
-        new_node = clone(node)
-        new_node.__class__ = ast.AsyncFunctionDef
-        yield Replace(node, new_node)
-
-
-class TestInsertBeforeDecoratedFunction(Rule):
-    INPUT_SOURCE = """
-        @decorate
-        def decorated():
-            test_this()"""
-
-    EXPECTED_SOURCE = """
-        await async_test()
-        @decorate
-        async def decorated():
             test_this()"""
 
     def match(self, node: ast.AST) -> Iterator[InsertBefore]:
@@ -496,6 +522,7 @@ def test_erase_invalid(invalid_node):
     "rule",
     [
         TestInsertBeforeDecoratedFunction,
+        TestInsertBeforeMultipleDecorators,
         TestInsertAfterBottom,
         TestInsertBeforeTop,
         TestInsertAfter,
