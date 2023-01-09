@@ -10,7 +10,7 @@ from refactor import common
 from refactor.actions import InsertAfter, LazyReplace, Replace
 from refactor.change import Change
 from refactor.context import Configuration, Context, Representative
-from refactor.core import Rule, Session
+from refactor.core import Rule, Session, RuleCollection
 
 fake_ctx = Context(source="<test>", tree=ast.AST())
 test_file = common._FileInfo()
@@ -108,6 +108,10 @@ class PlaceholderReplacer(Rule):
         return Replace(node, self.context["simple"].infer_value(node))
 
 
+class CollectPlusToMinusPlaceholderReplacerRule(RuleCollection):
+    rules = [PlusToMinusRule, PlaceholderReplacer]
+
+
 @pytest.mark.parametrize(
     "source, expected, rules",
     [
@@ -148,6 +152,23 @@ class PlaceholderReplacer(Rule):
     ],
 )
 def test_session_simple(source, rules, expected):
+    if isinstance(rules, type):
+        rules = [rules]
+
+    source = textwrap.dedent(source)
+    expected = textwrap.dedent(expected)
+
+    session = Session(rules)
+    assert session.run(source) == expected
+
+
+@pytest.mark.parametrize(
+    "source, expected, rules",
+    [
+        ("1+1", "1 - 1", CollectPlusToMinusPlaceholderReplacerRule),
+    ]
+)
+def test_session_collection(source, rules, expected):
     if isinstance(rules, type):
         rules = [rules]
 

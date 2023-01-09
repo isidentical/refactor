@@ -7,7 +7,7 @@ from dataclasses import dataclass, field, replace
 from enum import Enum, auto
 from functools import cached_property
 from pathlib import Path
-from typing import Any, ClassVar, DefaultDict, Protocol, cast
+from typing import Any, ClassVar, DefaultDict, Protocol, cast, Type, List, Generator, Deque, Set
 
 import refactor.common as common
 from refactor.ast import UNPARSER_BACKENDS, BaseUnparser
@@ -32,18 +32,30 @@ class _Dependable(Protocol):
         ...
 
 
-def _resolve_dependencies(
-    dependables: Iterable[type[_Dependable]],
-) -> set[type[Representative]]:
-    dependencies: set[type[Representative]] = set()
+def _deque_expand(
+        iterable: Iterable[type[_Dependable] | Iterable[type[_Dependable]]],
+) -> Generator[type[_Dependable]]:
+    q: Deque[type[_Dependable] | Iterable[type[_Dependable]]] = deque(iterable)
+    while q:
+        item: type[_Dependable] | Iterable[type[_Dependable]] = q.popleft()
+        if hasattr(item, '__iter__') or isinstance(item, Iterable):
+            q.extendleft(iter(item))
+        else:
+            yield item
 
-    pool = deque(dependables)
+
+def _resolve_dependencies(
+        dependables: Iterable[Type[_Dependable] | Iterable[Type[_Dependable]]],
+) -> Set[Type[Representative]]:
+    dependencies: Set[Type[Representative]] = set()
+
+    pool = deque(_deque_expand(dependables))
     while pool:
-        dependable = pool.pop()
+        dependable: Type[_Dependable] = pool.pop()
         pool.extendleft(
-            dependency
-            for dependency in dependable.context_providers
-            if dependency not in dependencies
+            (cast(Type[_Dependable], dependency)
+             for dependency in dependable.context_providers
+             if dependency not in dependencies)
         )
 
         if issubclass(dependable, Representative):
