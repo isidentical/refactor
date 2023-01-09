@@ -65,22 +65,6 @@ class _IterableRuleCollection(type):
         return iter(cls.rules)
 
 
-class _RuleCollectionIterator:
-    """This is a hack to make the RuleCollection work as a Rule (Copilot says it as it is :'("""
-
-    def __init__(self, rules: List[Type[Rule]]) -> None:
-        self.rules = rules
-        self.index = 0
-
-    def __next__(self) -> Type[Rule]:
-        if self.index >= len(self.rules):
-            raise StopIteration
-
-        rule = self.rules[self.index]
-        self.index += 1
-        return rule
-
-
 @dataclass
 class RuleCollection(metaclass=_IterableRuleCollection):
     """Collects a set of Rule to be used as a standalone Rule in the Session's Rules"""
@@ -93,10 +77,6 @@ class RuleCollection(metaclass=_IterableRuleCollection):
     # rules: List[Type[Rule]] = field(default_factory=list)
 
     rule_instances: list[Rule] = field(default_factory=list)
-
-    def __iter__(self) -> _RuleCollectionIterator:
-        return _RuleCollectionIterator(getattr(self, "rules"))
-        return iter(getattr(self, "rules"))
 
     def initialize_rules(
             self,
@@ -113,7 +93,7 @@ class RuleCollection(metaclass=_IterableRuleCollection):
     def match(
             self,
             node: ast.AST,
-    ) -> Generator[Tuple[Rule, BaseAction | None | Iterator[BaseAction]]]:
+    ) -> Generator[tuple[Rule, BaseAction | None | Iterator[BaseAction]]]:
         """Match the given ``node`` against all the rules in the collection.
 
         It yields tuples of all the Rule, BaseAction that match.

@@ -45,15 +45,15 @@ def _deque_expand(
 
 
 def _resolve_dependencies(
-        dependables: Iterable[Type[_Dependable] | Iterable[Type[_Dependable]]],
+        dependables: Iterable[type[_Dependable] | Iterable[type[_Dependable]]],
 ) -> Set[Type[Representative]]:
-    dependencies: Set[Type[Representative]] = set()
+    dependencies: Set[type[Representative]] = set()
 
     pool = deque(_deque_expand(dependables))
     while pool:
-        dependable: Type[_Dependable] = pool.pop()
+        dependable: type[_Dependable] = pool.pop()
         pool.extendleft(
-            (cast(Type[_Dependable], dependency)
+            (cast(type[_Dependable], dependency)
              for dependency in dependable.context_providers
              if dependency not in dependencies)
         )
