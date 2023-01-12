@@ -46,7 +46,7 @@ def _match_from_rule_or_collection(
 ) -> Generator[Tuple[Rule, BaseAction | Iterator[BaseAction]]]:
     with suppress(AssertionError):
         if isinstance(r_or_c, RuleCollection):
-            yield r_or_c.match(node)
+            yield from r_or_c.match(node)
         else:
             yield r_or_c, r_or_c.match(node)
 
@@ -195,7 +195,7 @@ class _SourceFromIterator:
     rule: Rule
     action: BaseAction | Iterator[BaseAction]
     source_code: str
-    optimization: bool = field(default=True)
+    enable_optimizations: bool = field(default=True)
 
     def __post_init__(self):
         if not isinstance(self.source_code, str) or not self.source_code:
@@ -252,7 +252,7 @@ class _SourceFromIterator:
                                                     updated_action,
                                                     updated_source,
                                                     context=updated_context,
-                                                    optimization=False,
+                                                    enable_optimizations=False,
                                                     ).source()
 
             try:
@@ -272,12 +272,12 @@ class _SourceFromAction(_SourceFromIterator):
         if not isinstance(self.context, Context):
             raise TypeError("context must be a Context instance")
 
-    def source(self, optimization: Optional[bool] = None) -> str:
+    def source(self) -> str:
         """Apply a single action to the source"""
         if isinstance(action := self.action, Iterator):
             return super().source()
 
-        if optimization:
+        if self.enable_optimizations:
             action = optimize(self.action, self.context)
         source: str = action.apply(self.context, self.source_code)
         return source
