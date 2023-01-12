@@ -14,7 +14,7 @@ from refactor.context import (
     Scope,
     _resolve_dependencies,
 )
-from refactor.core import Rule
+from refactor.core import Rule, RuleCollection
 
 
 def get_context(source, *representatives, **kwargs):
@@ -295,6 +295,69 @@ def test_dependency_resolver():
     assert _resolve_dependencies([Rule4]) == {Rep1, Rep2}
     assert _resolve_dependencies([Rule5]) == {Rep1, Rep2}
     assert _resolve_dependencies([Rule6]) == {Rep1, Rep2, Rep3}
+
+    assert _resolve_dependencies([Rule1, Rule2]) == {Rep1}
+    assert _resolve_dependencies([Rule2, Rule3]) == {Rep1}
+    assert _resolve_dependencies([Rule1, Rule2, Rule3]) == {Rep1}
+    assert _resolve_dependencies([Rule1, Rule2, Rule4]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule1, Rule5]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule1, Rule6]) == {Rep1, Rep2, Rep3}
+    assert _resolve_dependencies([Rule1, Rule2, Rule5, Rule6]) == {
+        Rep1,
+        Rep2,
+        Rep3,
+    }
+
+
+def test_dependency_resolver_with_collection():
+    class Rep1(Representative):
+        pass
+
+    class Rep2(Representative):
+        context_providers = (Rep1,)
+
+    class Rep3(Representative):
+        context_providers = (Rep2,)
+
+    class Rule1(Rule):
+        pass
+
+    class Rule2(Rule):
+        context_providers = (Rep1,)
+
+    class Rule3(Rule):
+        context_providers = (Rep1,)
+
+    class Rule4(Rule):
+        context_providers = (Rep1, Rep2)
+
+    class Rule5(Rule):
+        context_providers = (Rep2,)
+
+    class Rule6(Rule):
+        context_providers = (Rep3,)
+
+    class Collection2(RuleCollection):
+        rules = [Rule1, Rule2]
+
+    class Collection4(RuleCollection):
+        rules = [Rule1, Rule2, Rule4]
+
+    class Collection6(RuleCollection):
+        rules = [Rule6]
+
+    assert _resolve_dependencies([Rule1]) == set()
+    assert _resolve_dependencies([Rule2]) == {Rep1}
+    assert _resolve_dependencies([Rule3]) == {Rep1}
+    assert _resolve_dependencies([Rule4]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule5]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule6]) == {Rep1, Rep2, Rep3}
+
+    assert _resolve_dependencies([Collection2]) == {Rep1}
+    assert _resolve_dependencies([Collection4]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Collection2, Rule4]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Rule4, Collection2]) == {Rep1, Rep2}
+    assert _resolve_dependencies([Collection2, Collection6]) == {Rep1, Rep2, Rep3}
 
     assert _resolve_dependencies([Rule1, Rule2]) == {Rep1}
     assert _resolve_dependencies([Rule2, Rule3]) == {Rep1}

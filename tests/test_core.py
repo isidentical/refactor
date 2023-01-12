@@ -10,7 +10,7 @@ from refactor import common
 from refactor.actions import InsertAfter, LazyReplace, Replace
 from refactor.change import Change
 from refactor.context import Configuration, Context, Representative
-from refactor.core import Rule, Session
+from refactor.core import Rule, Session, RuleCollection
 
 fake_ctx = Context(source="<test>", tree=ast.AST())
 test_file = common._FileInfo()
@@ -91,6 +91,38 @@ class PlusToMinusRule(Rule):
         return SimpleAction(node)
 
 
+class MultToMinusRule(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.BinOp)
+        assert isinstance(node.op, ast.Mult)
+
+        return SimpleAction(node)
+
+
+class DivToMinusRule(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.BinOp)
+        assert isinstance(node.op, ast.Div)
+
+        return SimpleAction(node)
+
+
+class ModuloToMinusRule(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.BinOp)
+        assert isinstance(node.op, ast.Mod)
+
+        return SimpleAction(node)
+
+
+class PowToMinusRule(Rule):
+    def match(self, node):
+        assert isinstance(node, ast.BinOp)
+        assert isinstance(node.op, ast.Pow)
+
+        return SimpleAction(node)
+
+
 class SimpleRepresentative(Representative):
     name = "simple"
 
@@ -148,6 +180,55 @@ class PlaceholderReplacer(Rule):
     ],
 )
 def test_session_simple(source, rules, expected):
+    if isinstance(rules, type):
+        rules = [rules]
+
+    source = textwrap.dedent(source)
+    expected = textwrap.dedent(expected)
+
+    session = Session(rules)
+    assert session.run(source) == expected
+
+
+class CollectPlusToMinusMultToMinusRule(RuleCollection):
+    rules = [PlusToMinusRule, MultToMinusRule, ]
+
+
+class CollectMultToMinusPlusToMinusRule(RuleCollection):
+    rules = [MultToMinusRule, PlusToMinusRule]
+
+
+@pytest.mark.parametrize(
+    "source, expected, rules",
+    [
+        ("1+1*2", "1 - 1 - 2", CollectPlusToMinusMultToMinusRule),
+        ("1+1*2", "1 - 1 - 2", CollectMultToMinusPlusToMinusRule),
+        ("1*1+2", "1 - 1 - 2", CollectPlusToMinusMultToMinusRule),
+        ("1*1+2", "1 - 1 - 2", CollectMultToMinusPlusToMinusRule),
+    ]
+)
+def test_session_collection(source, rules, expected):
+    if isinstance(rules, type):
+        rules = [rules]
+
+    source = textwrap.dedent(source)
+    expected = textwrap.dedent(expected)
+
+    session = Session(rules)
+    assert session.run(source) == expected
+
+
+class CollectCollectRule(RuleCollection):
+    rules = [DivToMinusRule, CollectPlusToMinusMultToMinusRule, ModuloToMinusRule]
+
+
+@pytest.mark.parametrize(
+    "source, expected, rules",
+    [
+        ("1+1*2/3%4", "1 - 1 - 2 - 3 - 4", CollectCollectRule),
+    ]
+)
+def test_session_multicollection(source, rules, expected):
     if isinstance(rules, type):
         rules = [rules]
 
