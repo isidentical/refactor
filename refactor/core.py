@@ -365,9 +365,7 @@ class Session:
                 continue
 
             for rule_or_collection in rules:
-                print(f"Running rule: {rule_or_collection.__class__.__name__}")
                 for new_source in _SourceFromRuleOrCollection(rule_or_collection).source(node, source):
-                    print(f"New source: {new_source not in _known_sources}")
                     if new_source not in _known_sources:
                         return self._run(
                             new_source,
